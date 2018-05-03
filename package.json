@@ -1,0 +1,24 @@
+{
+  "name": "pushapi-nodejs",
+  "version": "1.0.0",
+  "description": "Using the Coveo Cloud PushAPI in NodeJs",
+  "main": "push.js",
+  "dependencies": {
+    "fs": "0.0.1-security",
+    "request": "^2.85.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coveo/pushapi-nodejs.git"
+  },
+  "author": "Jerome Devost <jdevost@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/coveo/pushapi-nodejs/issues"
+  },
+  "homepage": "https://github.com/coveo/pushapi-nodejs#readme"
+}
