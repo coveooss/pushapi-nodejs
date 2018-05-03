@@ -32,6 +32,17 @@ or
 where *file.json* is a payload (json) for the PushApi, and *folder* contains multiple payload files.
 Don't forget to set **DocumentId** in the payloads.
 
+## What does it do?
+
+The helper does a minimal validation on the payload, then executes these API calls:
+
+1. Change source state to REBUILD
+1. Get a File container
+1. Upload the payload to the File container
+1. Sends the batch command to process the File container
+1. Change the source state back to IDLE
+
+You can add this attribute `"debug": true` in your **config.json** to see these requests and their response code.
 
 ## Dependencies
 - Node.js
