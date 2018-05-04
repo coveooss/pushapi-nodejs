@@ -5,8 +5,16 @@ const request = require('request');
 class PushApiHelper {
 
   constructor() {
-    this.config = require('./config');
+    this._dir = process.cwd();
+    try {
+      this.config = require(`${this._dir}/config`);
+    }
+    catch (e) {
+      PushApiHelper.throwError(`Couldn't load config.json file from ${this._dir}`, 1);
+    }
+
     this.validateConfig();
+    this._debug('\nconfig = ', this.config);
   }
 
   _debug () {
@@ -33,12 +41,13 @@ class PushApiHelper {
         }
       },
         (err, httpResponse, body) => {
-          this._debug('\nREQUEST: ', method, url, httpResponse && httpResponse.statusCode);
-          if (!err) {
+          this._debug('\nREQUEST: ', method, url, httpResponse && httpResponse.statusCode, err);
+          if (!err && [200, 201, 202].includes(httpResponse.statusCode)) {
             resolve(body);
           }
           else {
-            reject(err);
+            console.log('ERROR: ', err, httpResponse.statusCode, url);
+            reject(err || httpResponse.statusCode);
           }
         });
     });
@@ -81,12 +90,13 @@ class PushApiHelper {
         body: JSON.stringify(data)
       },
         (err, httpResponse, body) => {
-          if (!err) {
+          if (!err && [200, 201, 202].includes(httpResponse.statusCode)) {
             this._debug('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', { hour12: false }));
             this._log(body);
             resolve(body);
           }
           else {
+            console.log('ERROR: ', err, httpResponse.statusCode, this.uploadUri);
             reject(err);
           }
         });
@@ -128,25 +138,33 @@ class PushApiHelper {
       .then(this.getLargeFileContainer.bind(this))
       .then(this.uploadBatchFile.bind(this, data))
       .then(this.sendBatchRequest.bind(this))
-      .then(this.changeStatus.bind(this, 'IDLE'));
+      .then(this.changeStatus.bind(this, 'IDLE'))
+      .catch((err) => {
+        console.log(err);
+      });
+  }
+
+  static throwError (msg, code) {
+    console.warn(`\n\t${msg}`);
+    process.exit(code || 1);
   }
 
   validateConfig () {
     if (!this.config) {
-      throw new Error('Missing config');
+      PushApiHelper.throwError('Missing config', 2);
     }
     if (!this.config.platform) {
       this.config.platform = 'push.cloud.coveo.com';
     }
 
     if (!this.config.apiKey || this.config.apiKey === 'xx--your-api-key--abc') {
-      throw new Error('Missing apiKey in config.json');
+      PushApiHelper.throwError('Missing apiKey in config.json', 3);
     }
     if (!this.config.org || this.config.org === 'your-org-id') {
-      throw new Error('Missing org in config.json');
+      PushApiHelper.throwError('Missing org in config.json', 4);
     }
     if (!this.config.source || this.config.source === 'your-source-id') {
-      throw new Error('Missing source in config.json');
+      PushApiHelper.throwError('Missing source in config.json', 5);
     }
   }
 }

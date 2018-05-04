@@ -32,6 +32,16 @@ or
 where *file.json* is a payload (json) for the PushApi, and *folder* contains multiple payload files.
 Don't forget to set **DocumentId** in the payloads.
 
+## CLI command
+
+Until we add it to NPM and create a command line tool, you can simulate a command line interface by using `alias` in Bash terminals. For example:
+```
+alias pushapi='node ~/github/pushapi-nodejs/push.js'
+```
+
+Then you will simply need to execute `pushapi file.json` from any folder.
+
+
 ## What does it do?
 
 The helper does a minimal validation on the payload, then executes these API calls:
