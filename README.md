@@ -21,7 +21,7 @@ The code in this project uses the Push API from the Coveo Platform. You can use 
 
 ## How-to run
 
-First, you need to set up your config in a file `config.json`, then simply
+First, you need to set up your config in a file `.pushapi-config.json`, then simply
 
     node push.js file.json
 
@@ -52,7 +52,7 @@ The helper does a minimal validation on the payload, then executes these API cal
 1. Sends the batch command to process the File container
 1. Change the source state back to IDLE
 
-You can add this attribute `"debug": true` in your **config.json** to see these requests and their response code.
+You can add this attribute `"debug": true` in your **.pushapi-config.json** to see these requests and their response code.
 
 ## Dependencies
 - Node.js

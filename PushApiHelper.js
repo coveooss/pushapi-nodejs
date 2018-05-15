@@ -7,10 +7,10 @@ class PushApiHelper {
   constructor() {
     this._dir = process.cwd();
     try {
-      this.config = require(`${this._dir}/config`);
+      this.config = require(`${this._dir}/.pushapi-config`);
     }
     catch (e) {
-      PushApiHelper.throwError(`Couldn't load config.json file from ${this._dir}`, 1);
+      PushApiHelper.throwError(`Couldn't load .pushapi-config.json file from ${this._dir}`);
     }
 
     this.validateConfig();
@@ -151,20 +151,20 @@ class PushApiHelper {
 
   validateConfig () {
     if (!this.config) {
-      PushApiHelper.throwError('Missing config', 2);
+      PushApiHelper.throwError('Missing config (.pushapi-config.json)', 2);
     }
     if (!this.config.platform) {
       this.config.platform = 'push.cloud.coveo.com';
     }
 
     if (!this.config.apiKey || this.config.apiKey === 'xx--your-api-key--abc') {
-      PushApiHelper.throwError('Missing apiKey in config.json', 3);
+      PushApiHelper.throwError('Missing apiKey in .pushapi-config.json', 3);
     }
     if (!this.config.org || this.config.org === 'your-org-id') {
-      PushApiHelper.throwError('Missing org in config.json', 4);
+      PushApiHelper.throwError('Missing org in .pushapi-config.json', 4);
     }
     if (!this.config.source || this.config.source === 'your-source-id') {
-      PushApiHelper.throwError('Missing source in config.json', 5);
+      PushApiHelper.throwError('Missing source in .pushapi-config.json', 5);
     }
   }
 }

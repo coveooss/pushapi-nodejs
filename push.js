@@ -32,31 +32,71 @@ function pushFile (pushApiHelper, file) {
     });
 }
 
-try {
-    let stats = fs.statSync(FILE_OR_FOLDER);
-    if (stats.isDirectory()) {
-        let folderName = FILE_OR_FOLDER;
-        let _dir = process.cwd();
+function main () {
+    try {
+        let stats = fs.statSync(FILE_OR_FOLDER);
+        if (stats.isDirectory()) {
+            let folderName = FILE_OR_FOLDER;
+            let _dir = process.cwd();
 
-        // process every .json files in the folder as separate batch requests.
-        console.log(`Loading folder: ${_dir}/${folderName}`);
-        fs.readdir(`${_dir}/${folderName}`, (err, data) => {
-            let pushApiHelper = new PushApiHelper();
-            data
-                .filter(fileName => (/\.json$/.test(fileName)))
-                .forEach(fileName => {
-                    pushFile(pushApiHelper, `${_dir}/${folderName}/${fileName}`);
-                });
-        });
-    }
-    else if (stats.isFile()) {
-        pushFile(new PushApiHelper(), FILE_OR_FOLDER);
-    }
-    else {
-        showUsage();
-    }
+            // process every .json files in the folder as separate batch requests.
+            console.log(`Loading folder: ${_dir}/${folderName}`);
+            fs.readdir(`${_dir}/${folderName}`, (err, data) => {
+                let pushApiHelper = new PushApiHelper();
+                data
+                    .filter(fileName => (/\.json$/.test(fileName)))
+                    .forEach(fileName => {
+                        pushFile(pushApiHelper, `${_dir}/${folderName}/${fileName}`);
+                    });
+            });
+        }
+        else if (stats.isFile()) {
+            pushFile(new PushApiHelper(), FILE_OR_FOLDER);
+        }
+        else {
+            showUsage();
+        }
 
+    }
+    catch (e) {
+        PushApiHelper.throwError(e, 10);
+    }
 }
-catch (e) {
-    PushApiHelper.throwError(e, 10);
+
+
+let configFile = `${process.cwd()}/.pushapi-config.json`;
+if (!fs.existsSync(configFile)) {
+    console.warn(`\n\tCouldn't load ${configFile} file`);
+
+    const readline = require('readline');
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    rl.question('\nWould you like to create the config file now? ', (answer) => {
+        if ((/^y(es)?$/i).test(answer)) {
+            rl.question('Org ID: ', org => {
+                rl.question('Source ID: ', source => {
+                    rl.question('API key: ', apiKey => {
+                        rl.close();
+                        console.log('creating file:  ', configFile);
+                        fs.writeFileSync(
+                            configFile,
+                            JSON.stringify({ org, source, apiKey }, 2, 2)
+                        );
+                        fs.chmodSync(configFile, 0600);
+                        main();
+                    });
+                });
+            });
+        }
+        else {
+            rl.close();
+            process.exit();
+        }
+    });
+}
+else {
+    main();
 }
