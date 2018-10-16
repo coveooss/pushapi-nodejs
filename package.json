@@ -1,8 +1,9 @@
 {
-  "name": "pushapi-nodejs",
+  "name": "coveo-pushapi-nodejs",
   "version": "1.0.1",
-  "description": "Using the Coveo Cloud PushAPI in NodeJs",
+  "description": "Command line tool to push JSON payloads to the Coveo Cloud using the PushAPI",
   "main": "push.js",
+  "keywords": ["coveo", "cloud", "push", "pushapi", "json"],
   "dependencies": {
     "fs": "0.0.1-security",
     "request": "^2.85.0"
@@ -19,6 +20,9 @@
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/coveo/pushapi-nodejs/issues"
+  },
+  "bin": {
+    "pushapi": "./push.js"
   },
   "homepage": "https://github.com/coveo/pushapi-nodejs#readme"
 }
