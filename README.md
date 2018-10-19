@@ -19,27 +19,27 @@ The code in this project uses the Push API from the Coveo Platform. You can use 
 1. `npm install` to get the dependencies (request, fs)
 
 
+## CLI command
+
+Install it with NPM:
+```
+npm i coveo-pushapi-cli
+```
+
 ## How-to run
 
-First, you need to set up your config in a file `.pushapi-config.json`, then simply
+Simply run
 
-    node push.js file.json
+    pushapi file.json
 
 or
 
-    node push.js folder
+    pushapi folder
 
 where *file.json* is a payload (json) for the PushApi, and *folder* contains multiple payload files.
 Don't forget to set **DocumentId** in the payloads.
 
-## CLI command
-
-Until we add it to NPM and create a command line tool, you can simulate a command line interface by using `alias` in Bash terminals. For example:
-```
-alias pushapi='node ~/github/pushapi-nodejs/push.js'
-```
-
-Then you will simply need to execute `pushapi file.json` from any folder.
+The first time you run in one folder, it will help you to set up your config `.pushapi-config.json` by asking about your `sourceId` and your `API key`.
 
 
 ## What does it do?
