@@ -50,12 +50,13 @@ class PushApiHelper {
           }
         },
         (err, httpResponse, body) => {
-          this._debug('\nREQUEST: ', method, url, httpResponse && httpResponse.statusCode, err);
-          if (!err && [200, 201, 202].includes(httpResponse.statusCode)) {
+          const statusCode = httpResponse && httpResponse.statusCode;
+          this._debug('\nREQUEST: ', method, url, statusCode, err);
+          if (!err && [200, 201, 202].includes(statusCode)) {
             resolve(body);
           } else {
-            console.log('ERROR: ', err, httpResponse.statusCode, url);
-            reject(err || httpResponse.statusCode);
+            console.log('ERROR: ', err, statusCode, url);
+            reject(err || statusCode);
           }
         });
     });
