@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 const fs = require('fs');
 const bigjson = require('big-json');
-const PushApiHelper = require('./PushApi');
+const PushApiHelper = require('./PushApiHelper');
 
 const MAX_BUFFER_SIZE = 250 * 1024 * 1024; // 256 MB is max for Push payloads, using 250 to keep it safe.
 

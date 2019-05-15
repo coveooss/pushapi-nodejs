@@ -178,7 +178,6 @@ class PushApiHelper {
         maxBodyLength: 256 * 1024 * 1024,
         data: dataStream
       }).then(response => {
-
         console.log('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', {
           hour12: false
         }));
@@ -197,12 +196,12 @@ class PushApiHelper {
       body: data
     });
 
-    return this._uploadData(stringifyStream);
+    return this._uploadDataStream(stringifyStream);
   }
 
   uploadFileStream(fileName) {
     let inStream = fs.readFileSync(fileName);
-    return this._uploadData(inStream);
+    return this._uploadDataStream(inStream);
   }
 
   validateConfig() {
