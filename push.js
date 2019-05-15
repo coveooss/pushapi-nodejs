@@ -15,7 +15,6 @@ const argv = require('yargs')
   .help()
   .argv;
 
-
 const FILE_OR_FOLDER = argv._[0];
 
 function pushFile(file) {
@@ -38,11 +37,17 @@ function pushFile(file) {
 
 async function main() {
   try {
+
+    if (argv.deleteOlderThan !== null) {
+      console.log(`Deleting items older than ${argv.deleteOlderThan} hours.`);
+      const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000);
+      (new PushApiHelper()).deleteOlderThan(orderingId);
+    }
+
     let stats = fs.statSync(FILE_OR_FOLDER);
     if (stats.isDirectory()) {
       let _dir = process.cwd();
       let folderName = FILE_OR_FOLDER;
-      folderName = folderName.replace(/\/\s*/g, '');
 
       // process every .json files in the folder as separate batch requests.
       console.log(`Loading folder: ${_dir}/${folderName}`);
