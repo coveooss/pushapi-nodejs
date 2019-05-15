@@ -134,11 +134,11 @@ class PushApiHelper {
       .then(this.getLargeFileContainer.bind(this))
       .then(this.uploadDataAsStream.bind(this, data))
       .then(this.sendBatchRequest.bind(this))
-      .then(this.changeStatus.bind(this, 'IDLE'))
       .catch((err) => {
         console.log(err);
       })
       .finally(() => {
+        this.changeStatus('IDLE')
         // helping Garbage Collector
         data.AddOrUpdate = null;
         data = null;
@@ -151,10 +151,10 @@ class PushApiHelper {
       .then(this.getLargeFileContainer.bind(this))
       .then(this.uploadFileStream.bind(this, fileName))
       .then(this.sendBatchRequest.bind(this))
-      .then(this.changeStatus.bind(this, 'IDLE'))
       .catch((err) => {
         console.log(err);
-      });
+      })
+      .finally(this.changeStatus.bind(this, 'IDLE'));
   }
 
   sendBatchRequest(fileId) {
@@ -186,17 +186,12 @@ class PushApiHelper {
       })
       .catch(err => {
         console.log('ERROR 1: ', err, this.uploadUri);
-        return (err);
+        throw err;
       });
   }
 
   uploadDataAsStream(data) {
-    const bigjson = require('big-json');
-    const stringifyStream = bigjson.createStringifyStream({
-      body: data
-    });
-
-    return this._uploadDataStream(stringifyStream);
+    return this._uploadDataStream(JSON.stringify(data));
   }
 
   uploadFileStream(fileName) {
