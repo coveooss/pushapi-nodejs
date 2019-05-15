@@ -11,6 +11,8 @@
     "json"
   ],
   "dependencies": {
+    "axios": "^0.18.0",
+    "big-json": "^2.0.2",
     "request": "^2.88.0"
   },
   "devDependencies": {},

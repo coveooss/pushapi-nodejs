@@ -9,7 +9,7 @@ The code in this project uses the Push API from the Coveo Platform. You can use 
 - PushAPI documentation: https://docs.coveo.com/en/68/cloud-v2-developers/push-api
 
 ## Contributing
-- Branch
+- Branch or Fork
 - Pull Request
 - And... that's pretty much it!
 
