@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 const fs = require('fs');
-const PushApiBuffer = require('./PushApiBuffer');
-const PushApiHelper = require('./PushApiHelper');
+const PushApiBuffer = require('./src/PushApiBuffer');
+const PushApiHelper = require('./src/PushApiHelper');
 
 
 const argv = require('yargs')
