@@ -13,11 +13,14 @@
   "dependencies": {
     "axios": "^0.18.0",
     "big-json": "^2.0.2",
+    "snyk": "^1.165.0",
     "yargs": "^13.2.4"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "snyk test",
+    "snyk-protect": "snyk protect",
+    "prepare": "npm run snyk-protect"
   },
   "repository": {
     "type": "git",
@@ -31,5 +34,6 @@
   "bin": {
     "pushapi": "client-global.js"
   },
-  "homepage": "https://github.com/coveo/pushapi-nodejs#readme"
+  "homepage": "https://github.com/coveo/pushapi-nodejs#readme",
+  "snyk": true
 }
