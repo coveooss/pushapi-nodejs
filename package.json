@@ -12,7 +12,8 @@
   ],
   "dependencies": {
     "axios": "^0.18.0",
-    "big-json": "^2.0.2"
+    "big-json": "^2.0.2",
+    "yargs": "^13.2.4"
   },
   "devDependencies": {},
   "scripts": {

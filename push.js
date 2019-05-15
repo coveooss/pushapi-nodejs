@@ -3,17 +3,20 @@ const fs = require('fs');
 const PushApiBuffer = require('./PushApiBuffer');
 const PushApiHelper = require('./PushApiHelper');
 
-function showUsage() {
-  let processName = (process.argv[1] || '').split('/').pop();
-  console.log(`MISSING or INVALID [FILE_OR_FOLDER].\n\n  Usage:\n\t node ${processName} file.json\n\t node ${processName} folderName\n`);
 
-  process.exit();
-}
+const argv = require('yargs')
+  .usage('\nUsage: $0 <File_or_Folder> [-d 0]')
+  .example('$0 file1.json', 'Upload a single file to a Push Source')
+  .example('$0 folder2', 'Upload all .json files from a folder to a Push Source')
+  .example('$0 folder3 -d 2', 'Sends a deleteOlderThan 2 hours before pushing new data')
+  .alias('d', 'deleteOlderThan')
+  .default('d', null)
+  .demandCommand(1, 'You need to specify a FILE or a FOLDER')
+  .help()
+  .argv;
 
-const FILE_OR_FOLDER = process.argv[2];
-if (!FILE_OR_FOLDER) {
-  showUsage();
-}
+
+const FILE_OR_FOLDER = argv._[0];
 
 function pushFile(file) {
   console.log(`Loading file: ${file}`);
@@ -57,7 +60,7 @@ async function main() {
     } else if (stats.isFile()) {
       pushFile(FILE_OR_FOLDER);
     } else {
-      showUsage();
+      argv.help();
     }
 
   } catch (e) {
