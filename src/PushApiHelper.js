@@ -1,8 +1,7 @@
 /* eslint-disable no-console */
 'use strict';
 
-const axios = require('axios');
-const fs = require('fs');
+const request = require('request');
 
 class PushApiHelper {
 
@@ -42,19 +41,25 @@ class PushApiHelper {
     let config = this.config,
       url = /^http/.test(action) ? action : `https://${config.platform}/v1/organizations/${config.org}/sources/${config.source}/${action}`;
 
-    return axios({
-      method: method,
-      url: url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
-      },
-    }).then(response => {
-      console.log('\nREQUEST: ', method, url, response.status, response.statusText);
-      return response.data;
-    }).catch(err => {
-      console.log('ERROR: ', err, err.response.status, url);
-      console.log('ERROR-msg: ', err.response.data);
+    return new Promise((resolve, reject) => {
+      request({
+          method: method,
+          url: url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey}`,
+          },
+        },
+        (error, response, body) => {
+          if (error) {
+            console.log('ERROR: ', error, response.statusCode, url);
+            console.log('ERROR-msg: ', body);
+            reject(error);
+          } else {
+            console.log('\nREQUEST: ', method, url, response.statusCode, response.statusMessage);
+            resolve(body);
+          }
+        })
     });
   }
 
@@ -115,7 +120,6 @@ class PushApiHelper {
       delete data[key];
     }
 
-
     let fileExtensionWarning = false;
     // validate each document has a DocumentId
     data.AddOrUpdate.forEach(d => {
@@ -130,28 +134,15 @@ class PushApiHelper {
     });
 
     // push
-    await this.changeStatus('REBUILD');
-    try {
-      await this.getLargeFileContainer();
-      await this.uploadDataAsStream(data);
-      await this.sendBatchRequest();
-    } catch (err) {
-      console.log(err);
-    }
-
-    // clearing references in data
-    data.AddOrUpdate = null;
-    data = null;
-
-    await this.changeStatus('IDLE');
+    return await this.pushJsonPayload(data);
   }
 
-  async pushFileBuffer(fileName) {
+  async pushJsonPayload(data) {
     // push
     await this.changeStatus('REBUILD');
     try {
       await this.getLargeFileContainer();
-      await this.uploadFileStream(fileName);
+      await this.uploadJson(data);
       await this.sendBatchRequest();
     } catch (err) {
       console.log(err);
@@ -169,8 +160,9 @@ class PushApiHelper {
     process.exit(code || 1);
   }
 
-  async _uploadDataStream(dataStream) {
-    return axios({
+  async uploadJson(body) {
+    return new Promise((resolve, reject) => {
+      request({
         method: 'PUT',
         url: this.uploadUri,
         headers: {
@@ -179,27 +171,21 @@ class PushApiHelper {
         },
         maxContentLength: 256000000, // 256 MB
         maxBodyLength: 256000000,
-        data: dataStream
-      }).then(response => {
-        console.log('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', {
-          hour12: false
-        }));
-        console.log(response.data);
-        return (response.data);
-      })
-      .catch(err => {
-        console.log('ERROR 1: ', err, this.uploadUri);
-        throw err;
+        body,
+        json: true,
+      }, (error, response) => {
+        if (error) {
+          console.log('ERROR 1: ', error, this.uploadUri);
+          reject(error);
+        } else {
+          console.log('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', {
+            hour12: false
+          }));
+          console.log(response.statusCode, response.statusMessage);
+          resolve(response);
+        }
       });
-  }
-
-  async uploadDataAsStream(data) {
-    return this._uploadDataStream(JSON.stringify(data));
-  }
-
-  async uploadFileStream(fileName) {
-    let inStream = fs.readFileSync(fileName);
-    return this._uploadDataStream(inStream);
+    });
   }
 
   validateConfig() {

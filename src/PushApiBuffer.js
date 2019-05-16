@@ -1,6 +1,5 @@
 /* eslint-disable no-console */
 const fs = require('fs');
-const bigjson = require('big-json');
 const PushApiHelper = require('./PushApiHelper');
 
 const MAX_BUFFER_SIZE = 250000000; // 256 MB is max for Push payloads, using 250 to keep it safe.
@@ -65,31 +64,17 @@ class PushApiBuffer {
       }
 
       const bufferName = `.buffer.${this.bufferCount}`;
-
-      const fout = fs.createWriteStream(bufferName);
-      const stringifyStream = bigjson.createStringifyStream({
-        body: {
+      this.getPushApiHelper()
+        .pushJsonPayload({
           AddOrUpdate: this.buffer
-        }
-      });
-
-      stringifyStream.pipe(fout);
-
-      stringifyStream.on('end', () => {
-        console.log('write done on ', bufferName);
-        fout.close();
-
-        this.getPushApiHelper().pushFileBuffer(bufferName).then(() => {
-          console.log('UPLOAD done on ', bufferName);
-
-          fs.unlinkSync(bufferName);
+        })
+        .then(() => {
+          console.log('UPLOAD done ', bufferName);
           this.buffer = [];
           this.bufferSize = 0;
           this.bufferCount++;
           resolve();
         });
-      });
-
     });
   }
 }
