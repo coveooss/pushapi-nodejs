@@ -2,7 +2,7 @@
 const fs = require('fs');
 const PushApiHelper = require('./PushApiHelper');
 
-const MAX_BUFFER_SIZE = 250000000; // 256 MB is max for Push payloads, using 250 to keep it safe.
+const MAX_BUFFER_SIZE = 256000000; // 256 MB is max for Push payloads.
 
 class PushApiBuffer {
   constructor() {
