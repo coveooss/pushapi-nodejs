@@ -38,7 +38,7 @@ class PushApiHelper {
     return !(keys.includes(key.toLowerCase()));
   }
 
-  _sendRequest(method, action) {
+  async _sendRequest(method, action) {
     let config = this.config,
       url = /^http/.test(action) ? action : `https://${config.platform}/v1/organizations/${config.org}/sources/${config.source}/${action}`;
 
@@ -58,17 +58,17 @@ class PushApiHelper {
     });
   }
 
-  changeStatus(state) {
+  async changeStatus(state) {
     return this._sendRequest(`POST`, `status?statusType=${state}`);
   }
 
-  deleteOlderThan(orderingId) {
+  async deleteOlderThan(orderingId) {
     if (orderingId < Date.now()) {
       return this._sendRequest(`DELETE`, `documents/olderthan?orderingId=${orderingId}`);
     }
   }
 
-  getLargeFileContainer() {
+  async getLargeFileContainer() {
     let config = this.config;
     return this._sendRequest(`POST`, `https://${config.platform}/v1/organizations/${config.org}/files`).then(
       body => {
@@ -86,7 +86,7 @@ class PushApiHelper {
     );
   }
 
-  pushFile(data) {
+  async pushFile(data) {
     // validate payload first
     if (!data) {
       console.warn('Invalid payload: not defined.');
@@ -129,35 +129,38 @@ class PushApiHelper {
       }
     });
 
-    // push it
-    return this.changeStatus('REBUILD')
-      .then(this.getLargeFileContainer.bind(this))
-      .then(this.uploadDataAsStream.bind(this, data))
-      .then(this.sendBatchRequest.bind(this))
-      .catch((err) => {
-        console.log(err);
-      })
-      .finally(() => {
-        this.changeStatus('IDLE')
-        // helping Garbage Collector
-        data.AddOrUpdate = null;
-        data = null;
-      });
+    // push
+    await this.changeStatus('REBUILD');
+    try {
+      await this.getLargeFileContainer();
+      await this.uploadDataAsStream(data);
+      await this.sendBatchRequest();
+    } catch (err) {
+      console.log(err);
+    }
+
+    // clearing references in data
+    data.AddOrUpdate = null;
+    data = null;
+
+    await this.changeStatus('IDLE');
   }
 
-  pushFileBuffer(fileName) {
-    // push it
-    return this.changeStatus('REBUILD')
-      .then(this.getLargeFileContainer.bind(this))
-      .then(this.uploadFileStream.bind(this, fileName))
-      .then(this.sendBatchRequest.bind(this))
-      .catch((err) => {
-        console.log(err);
-      })
-      .finally(this.changeStatus.bind(this, 'IDLE'));
+  async pushFileBuffer(fileName) {
+    // push
+    await this.changeStatus('REBUILD');
+    try {
+      await this.getLargeFileContainer();
+      await this.uploadFileStream(fileName);
+      await this.sendBatchRequest();
+    } catch (err) {
+      console.log(err);
+    }
+
+    await this.changeStatus('IDLE');
   }
 
-  sendBatchRequest(fileId) {
+  async sendBatchRequest(fileId) {
     return this._sendRequest(`PUT`, `documents/batch?fileId=${fileId || this.fileId}`);
   }
 
@@ -166,7 +169,7 @@ class PushApiHelper {
     process.exit(code || 1);
   }
 
-  _uploadDataStream(dataStream) {
+  async _uploadDataStream(dataStream) {
     return axios({
         method: 'PUT',
         url: this.uploadUri,
@@ -174,8 +177,8 @@ class PushApiHelper {
           'Content-Type': 'application/octet-stream',
           'x-amz-server-side-encryption': 'AES256'
         },
-        maxContentLength: 256 * 1024 * 1024,
-        maxBodyLength: 256 * 1024 * 1024,
+        maxContentLength: 256000000, // 256 MB
+        maxBodyLength: 256000000,
         data: dataStream
       }).then(response => {
         console.log('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', {
@@ -190,11 +193,11 @@ class PushApiHelper {
       });
   }
 
-  uploadDataAsStream(data) {
+  async uploadDataAsStream(data) {
     return this._uploadDataStream(JSON.stringify(data));
   }
 
-  uploadFileStream(fileName) {
+  async uploadFileStream(fileName) {
     let inStream = fs.readFileSync(fileName);
     return this._uploadDataStream(inStream);
   }
