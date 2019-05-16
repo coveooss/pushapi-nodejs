@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 'use strict';
 
 const request = require('request');
@@ -36,7 +37,7 @@ class PushApiHelper {
     return !(keys.includes(key.toLowerCase()));
   }
 
-  _sendRequest(method, action) {
+  async _sendRequest(method, action) {
     let config = this.config,
       url = /^http/.test(action) ? action : `https://${config.platform}/v1/organizations/${config.org}/sources/${config.source}/${action}`;
 
@@ -46,31 +47,38 @@ class PushApiHelper {
           url: url,
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + config.apiKey
-          }
+            'Authorization': `Bearer ${config.apiKey}`,
+          },
         },
-        (err, httpResponse, body) => {
-          const statusCode = httpResponse && httpResponse.statusCode;
-          this._debug('\nREQUEST: ', method, url, statusCode, err);
-          if (!err && [200, 201, 202].includes(statusCode)) {
-            resolve(body);
+        (error, response, body) => {
+          if (error) {
+            console.log('ERROR: ', error, response.statusCode, url);
+            console.log('ERROR-msg: ', body);
+            reject(error);
           } else {
-            console.log('ERROR: ', err, statusCode, url);
-            reject(err || statusCode);
+            console.log('\nREQUEST: ', method, url, response.statusCode, response.statusMessage);
+            resolve(body);
           }
-        });
+        })
     });
   }
 
-  changeStatus(state) {
+  async changeStatus(state) {
     return this._sendRequest(`POST`, `status?statusType=${state}`);
   }
 
-  getLargeFileContainer() {
+  async deleteOlderThan(orderingId) {
+    if (orderingId < Date.now()) {
+      return this._sendRequest(`DELETE`, `documents/olderthan?orderingId=${orderingId}`);
+    }
+  }
+
+  async getLargeFileContainer() {
     let config = this.config;
     return this._sendRequest(`POST`, `https://${config.platform}/v1/organizations/${config.org}/files`).then(
       body => {
-        let resp = JSON.parse(body);
+        console.log('getLargeFileContainer', typeof body);
+        let resp = (typeof body === 'string') ? JSON.parse(body) : body;
 
         this.uploadUri = resp.uploadUri;
         this.fileId = resp.fileId;
@@ -83,37 +91,7 @@ class PushApiHelper {
     );
   }
 
-  sendBatchRequest(fileId) {
-    return this._sendRequest(`PUT`, `documents/batch?fileId=${fileId || this.fileId}`);
-  }
-
-  uploadBatchFile(data) {
-    return new Promise((resolve, reject) => {
-
-      request.put({
-          url: this.uploadUri,
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'x-amz-server-side-encryption': 'AES256'
-          },
-          body: JSON.stringify(data)
-        },
-        (err, httpResponse, body) => {
-          if (!err && [200, 201, 202].includes(httpResponse.statusCode)) {
-            this._debug('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', {
-              hour12: false
-            }));
-            this._log(body);
-            resolve(body);
-          } else {
-            console.log('ERROR: ', err, httpResponse.statusCode, this.uploadUri);
-            reject(err);
-          }
-        });
-    });
-  }
-
-  pushFile(data) {
+  async pushFile(data) {
     // validate payload first
     if (!data) {
       console.warn('Invalid payload: not defined.');
@@ -131,18 +109,16 @@ class PushApiHelper {
           data
         ]
       };
-    }
-    else if (!data.AddOrUpdate) {
+    } else if (!data.AddOrUpdate) {
       // AddOrUpdate is present, but using a different case.
 
       // find the key using the different case
-      let key = Object.keys(data).filter(k=>k.match(/AddOrUpdate/i))[0];
+      let key = Object.keys(data).filter(k => k.match(/AddOrUpdate/i))[0];
 
       // replacing key by 'AddOrUpdate'
       data.AddOrUpdate = data[key];
       delete data[key];
     }
-
 
     let fileExtensionWarning = false;
     // validate each document has a DocumentId
@@ -157,20 +133,59 @@ class PushApiHelper {
       }
     });
 
-    // push it
-    return this.changeStatus('REBUILD')
-      .then(this.getLargeFileContainer.bind(this))
-      .then(this.uploadBatchFile.bind(this, data))
-      .then(this.sendBatchRequest.bind(this))
-      .then(this.changeStatus.bind(this, 'IDLE'))
-      .catch((err) => {
-        console.log(err);
-      });
+    // push
+    return await this.pushJsonPayload(data);
+  }
+
+  async pushJsonPayload(data) {
+    // push
+    await this.changeStatus('REBUILD');
+    try {
+      await this.getLargeFileContainer();
+      await this.uploadJson(data);
+      await this.sendBatchRequest();
+    } catch (err) {
+      console.log(err);
+    }
+
+    await this.changeStatus('IDLE');
+  }
+
+  async sendBatchRequest(fileId) {
+    return this._sendRequest(`PUT`, `documents/batch?fileId=${fileId || this.fileId}`);
   }
 
   static throwError(msg, code) {
     console.warn(`\n\t${msg}`);
     process.exit(code || 1);
+  }
+
+  async uploadJson(body) {
+    return new Promise((resolve, reject) => {
+      request({
+        method: 'PUT',
+        url: this.uploadUri,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'x-amz-server-side-encryption': 'AES256'
+        },
+        maxContentLength: 256000000, // 256 MB
+        maxBodyLength: 256000000,
+        body,
+        json: true,
+      }, (error, response) => {
+        if (error) {
+          console.log('ERROR 1: ', error, this.uploadUri);
+          reject(error);
+        } else {
+          console.log('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', {
+            hour12: false
+          }));
+          console.log(response.statusCode, response.statusMessage);
+          resolve(response);
+        }
+      });
+    });
   }
 
   validateConfig() {

@@ -1,27 +1,28 @@
-const uuidv4 = require('uuid/v4');
+/* eslint-disable no-console */
 const fs = require('fs');
-const PushApiHelper = require('./PushApiHelper');
+const PushApiBuffer = require('./src/PushApiBuffer');
+const PushApiHelper = require('./src/PushApiHelper');
 
-const MAX_BUFFER_SIZE = 250 * 1024 * 1024; // 250Mb max for Push payloads
 
-function showUsage() {
-  let processName = (process.argv[1] || '').split('/').pop();
-  console.log(`MISSING or INVALID [FILE_OR_FOLDER].\n\n  Usage:\n\t node ${processName} file.json\n\t node ${processName} folderName\n`);
+const argv = require('yargs')
+  .usage('\nUsage: $0 <File_or_Folder> [-d 0]')
+  .example('$0 file1.json', 'Upload a single file to a Push Source')
+  .example('$0 folder2', 'Upload all .json files from a folder to a Push Source')
+  .example('$0 folder3 -d 2', 'Sends a deleteOlderThan 2 hours before pushing new data')
+  .alias('d', 'deleteOlderThan')
+  .default('d', null)
+  .demandCommand(1, 'You need to specify a FILE or a FOLDER')
+  .help()
+  .argv;
 
-  process.exit();
-}
+const FILE_OR_FOLDER = argv._[0];
 
-const FILE_OR_FOLDER = process.argv[2];
-if (!FILE_OR_FOLDER) {
-  showUsage();
-}
-
-function pushFile(pushApiHelper, file) {
+function pushFile(file) {
   console.log(`Loading file: ${file}`);
   fs.readFile(file, (err, data) => {
     if (!err) {
       try {
-        pushApiHelper.pushFile(JSON.parse(data));
+        (new PushApiHelper()).pushFile(JSON.parse(data));
       } catch (e) {
         console.warn('Invalid payload.');
         console.warn(e);
@@ -33,61 +34,38 @@ function pushFile(pushApiHelper, file) {
   });
 }
 
-function main() {
+
+async function main() {
   try {
+
+    if (argv.deleteOlderThan !== null) {
+      console.log(`Deleting items older than ${argv.deleteOlderThan} hours.`);
+      const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000);
+      (new PushApiHelper()).deleteOlderThan(orderingId);
+    }
+
     let stats = fs.statSync(FILE_OR_FOLDER);
     if (stats.isDirectory()) {
       let _dir = process.cwd();
       let folderName = FILE_OR_FOLDER;
-      folderName = folderName.replace(/\/\s*/g, '');
 
       // process every .json files in the folder as separate batch requests.
       console.log(`Loading folder: ${_dir}/${folderName}`);
 
-      let buffer = [];
-      let bufferSize = 0;
-      let bufferCount = 1;
-
+      let pushApiBuffer = new PushApiBuffer();
       let files = fs.readdirSync(`${_dir}/${folderName}`);
-      let pushApiHelper = new PushApiHelper();
 
-      files
-        .filter(fileName => (/\.json$/.test(fileName)))
-        .forEach(fileName => {
-
-          // add to Buffer
-          let fileSize = fs.statSync(`${_dir}/${folderName}/${fileName}`);
-          fileSize = fileSize.size;
-
-          if (fileSize + bufferSize > MAX_BUFFER_SIZE) {
-            pushApiHelper.pushFile(buffer);
-            buffer = [];
-            bufferSize = 0;
-            bufferCount++;
-          } else {
-            try {
-              let payload = require(`${_dir}/${folderName}/${fileName}`);
-              if (payload instanceof Array) {
-                buffer.push(...payload);
-              } else {
-                buffer.push(payload);
-              }
-              bufferSize += fileSize;
-            } catch (e) {
-              console.log(e);
-            }
-          }
-        });
-
-      if (bufferSize > 0) {
-        pushApiHelper.pushFile(buffer);
+      // consider only .json files
+      files = files.filter(fileName => (/\.json$/.test(fileName)));
+      for (let fileName of files) {
+        await pushApiBuffer.addJsonFile(`${_dir}/${folderName}/${fileName}`);
       }
-      buffer = null;
+      pushApiBuffer.sendBuffer();
 
     } else if (stats.isFile()) {
-      pushFile(new PushApiHelper(), FILE_OR_FOLDER);
+      pushFile(FILE_OR_FOLDER);
     } else {
-      showUsage();
+      argv.help();
     }
 
   } catch (e) {
@@ -122,7 +100,10 @@ if (!fs.existsSync(configFile)) {
               configFile,
               JSON.stringify(payload, 2, 2)
             );
+
+            // eslint-disable-next-line no-octal
             fs.chmodSync(configFile, 0600);
+
             main();
           });
         });
@@ -133,5 +114,5 @@ if (!fs.existsSync(configFile)) {
     }
   });
 } else {
-  main();
+  return main();
 }
