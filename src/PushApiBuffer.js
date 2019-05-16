@@ -3,7 +3,7 @@ const fs = require('fs');
 const bigjson = require('big-json');
 const PushApiHelper = require('./PushApiHelper');
 
-const MAX_BUFFER_SIZE = 250 * 1024 * 1024; // 256 MB is max for Push payloads, using 250 to keep it safe.
+const MAX_BUFFER_SIZE = 250000000; // 256 MB is max for Push payloads, using 250 to keep it safe.
 
 class PushApiBuffer {
   constructor() {
@@ -20,7 +20,7 @@ class PushApiBuffer {
 
     if (fileSize > MAX_BUFFER_SIZE) {
       console.warn('\n File is bigger than maximum size. You need to break it up.\nSkipping this file: ', pathToJson);
-    } else if (fileSize + this.bufferSize > MAX_BUFFER_SIZE) {
+    } else if ((this.bufferSize + fileSize) > MAX_BUFFER_SIZE) {
       console.log('\n ------ BATCH ------ \n', this.bufferSize);
       await this.sendBuffer();
       await this.addJsonFile(pathToJson);
