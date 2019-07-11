@@ -12,7 +12,7 @@
   ],
   "dependencies": {
     "request": "^2.88.0",
-    "snyk": "^1.189.0",
+    "snyk": "^1.192.5",
     "yargs": "^13.2.4"
   },
   "devDependencies": {},
