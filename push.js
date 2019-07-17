@@ -84,12 +84,20 @@ if (!fs.existsSync(configFile)) {
     output: process.stdout
   });
 
-  rl.question('\nWould you like to create the config file now? ', (answer) => {
-    if ((/^y(es)?$/i).test(answer)) {
-      rl.question('Org ID: ', org => {
-        rl.question('Source ID: ', source => {
+  rl.question('\nWould you like to create the config file now? [Y/n] ', (answer) => {
+    if (!answer || (/^y(es)?$/i).test(answer)) {
+      rl.question('Source ID: ', source => {
+        source = (source || '').trim();
+        const orgFromSourceId = source.split('-')[0];
+        rl.question(`Org ID: [${orgFromSourceId}]`, org => {
+          org = (org || '').trim();
+          if (!org && orgFromSourceId) {
+            org = orgFromSourceId;
+          }
           rl.question('API key: ', apiKey => {
             rl.close();
+            apiKey = (apiKey || '').trim();
+
             console.log('creating file:  ', configFile);
             let payload = {
               org,

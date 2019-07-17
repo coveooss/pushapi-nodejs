@@ -57,7 +57,11 @@ class PushApiHelper {
             reject(error);
           } else {
             console.log('\nREQUEST: ', method, url, response.statusCode, response.statusMessage);
-            resolve(body);
+            if (response.statusCode >= 400) {
+              reject(response);
+            } else {
+              resolve(body);
+            }
           }
         })
     });
@@ -139,16 +143,23 @@ class PushApiHelper {
 
   async pushJsonPayload(data) {
     // push
-    await this.changeStatus('REBUILD');
     try {
+      await this.changeStatus('REBUILD');
+
       await this.getLargeFileContainer();
       await this.uploadJson(data);
       await this.sendBatchRequest();
-    } catch (err) {
-      console.log(err);
-    }
 
-    await this.changeStatus('IDLE');
+      await this.changeStatus('IDLE');
+    } catch (err) {
+      console.error('\n\nERROR: ', );
+      console.error(err.statusCode, err.statusMessage);
+      console.error(err.body);
+      console.error('\n\n');
+
+      // put back to Idle
+      await this.changeStatus('IDLE');
+    }
   }
 
   async sendBatchRequest(fileId) {
