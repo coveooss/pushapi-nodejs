@@ -38,10 +38,12 @@ function pushFile(file) {
 async function main() {
   try {
 
+    const pushApiHelper = new PushApiHelper();
+
     if (argv.deleteOlderThan !== null) {
       console.log(`Deleting items older than ${argv.deleteOlderThan} hours.`);
       const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000);
-      (new PushApiHelper()).deleteOlderThan(orderingId);
+      pushApiHelper.deleteOlderThan(orderingId);
     }
 
     let stats = fs.statSync(FILE_OR_FOLDER);
@@ -52,6 +54,8 @@ async function main() {
       // process every .json files in the folder as separate batch requests.
       console.log(`Loading folder: ${_dir}/${folderName}`);
 
+      await pushApiHelper.changeStatus('REBUILD');
+
       let pushApiBuffer = new PushApiBuffer();
       let files = fs.readdirSync(`${_dir}/${folderName}`);
 
@@ -60,7 +64,9 @@ async function main() {
       for (let fileName of files) {
         await pushApiBuffer.addJsonFile(`${_dir}/${folderName}/${fileName}`);
       }
-      pushApiBuffer.sendBuffer();
+      await pushApiBuffer.sendBuffer();
+
+      await pushApiHelper.changeStatus('IDLE');
 
     } else if (stats.isFile()) {
       pushFile(FILE_OR_FOLDER);
