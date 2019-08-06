@@ -144,21 +144,14 @@ class PushApiHelper {
   async pushJsonPayload(data) {
     // push
     try {
-      await this.changeStatus('REBUILD');
-
       await this.getLargeFileContainer();
       await this.uploadJson(data);
       await this.sendBatchRequest();
-
-      await this.changeStatus('IDLE');
     } catch (err) {
       console.error('\n\nERROR: ', );
       console.error(err.statusCode, err.statusMessage);
       console.error(err.body);
       console.error('\n\n');
-
-      // put back to Idle
-      await this.changeStatus('IDLE');
     }
   }
 
