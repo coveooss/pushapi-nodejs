@@ -19,10 +19,13 @@ const FILE_OR_FOLDER = argv._[0];
 
 function pushFile(file) {
   console.log(`Loading file: ${file}`);
-  fs.readFile(file, (err, data) => {
+  fs.readFile(file, async (err, data) => {
     if (!err) {
       try {
-        (new PushApiHelper()).pushFile(JSON.parse(data));
+        const pushApiHelper = new PushApiHelper();
+        await pushApiHelper.changeStatus('REBUILD');
+        await pushApiHelper.pushFile(JSON.parse(data));
+        await pushApiHelper.changeStatus('IDLE');
       } catch (e) {
         console.warn('Invalid payload.');
         console.warn(e);
@@ -43,7 +46,7 @@ async function main() {
     if (argv.deleteOlderThan !== null) {
       console.log(`Deleting items older than ${argv.deleteOlderThan} hours.`);
       const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000);
-      pushApiHelper.deleteOlderThan(orderingId);
+      await pushApiHelper.deleteOlderThan(orderingId);
     }
 
     let stats = fs.statSync(FILE_OR_FOLDER);
