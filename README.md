@@ -77,4 +77,3 @@ The helper does a minimal validation on the payload, then executes these API cal
 ## Authors
 
 - Jérôme Devost (https://github.com/jdevost)
-s
