@@ -5,8 +5,10 @@ const request = require('request');
 
 class PushApiHelper {
 
-  constructor() {
+  constructor(dryRun = false) {
     this._dir = process.cwd();
+    this._dryRun = dryRun;
+
     try {
       this.config = require(`${this._dir}/.pushapi-config`);
     } catch (e) {
@@ -40,6 +42,11 @@ class PushApiHelper {
   async _sendRequest(method, action) {
     let config = this.config,
       url = /^http/.test(action) ? action : `https://${config.platform}/v1/organizations/${config.org}/sources/${config.source}/${action}`;
+
+    if (this._dryRun) {
+      // console.log('DRY-RUN: skip ', url);
+      return Promise.resolve();
+    }
 
     return new Promise((resolve, reject) => {
       request({
@@ -142,6 +149,11 @@ class PushApiHelper {
   }
 
   async pushJsonPayload(data) {
+    if (this._dryRun) {
+      console.log('DRY-RUN: not pushing.');
+      return;
+    }
+
     // push
     try {
       await this.getLargeFileContainer();

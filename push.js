@@ -5,12 +5,16 @@ const PushApiHelper = require('./src/PushApiHelper');
 
 
 const argv = require('yargs')
-  .usage('\nUsage: $0 <File_or_Folder> [-d 0]')
+  .usage('\nUsage: $0 <File_or_Folder> [options]')
   .example('$0 file1.json', 'Upload a single file to a Push Source')
   .example('$0 folder2', 'Upload all .json files from a folder to a Push Source')
   .example('$0 folder3 -d 2', 'Sends a deleteOlderThan 2 hours before pushing new data')
   .alias('d', 'deleteOlderThan')
   .default('d', null)
+  .describe('d', 'Set the deleteOlderThan delay (in hours)')
+  .alias('D', 'dry-run')
+  .boolean('D')
+  .describe('D', 'Dry run - creates the batch files, without pushing them')
   .demandCommand(1, 'You need to specify a FILE or a FOLDER')
   .help()
   .argv;
@@ -19,6 +23,10 @@ const FILE_OR_FOLDER = argv._[0];
 
 function pushFile(file) {
   console.log(`Loading file: ${file}`);
+  if (argv['dry-run']) {
+    console.log('DRY-RUN, not pushing.');
+    return;
+  }
   fs.readFile(file, async (err, data) => {
     if (!err) {
       try {
@@ -37,16 +45,28 @@ function pushFile(file) {
   });
 }
 
+function deleteBuffers() {
+  let buffers = fs.readdirSync('.').filter(fileName => fileName.startsWith('.pushapi.buffer.'));
+  buffers.forEach(fileName => {
+    console.log('deleting buffer: ', fileName);
+    fs.unlinkSync(fileName);
+  });
+  console.log('');
+}
 
 async function main() {
   try {
-
-    const pushApiHelper = new PushApiHelper();
+    const dryRun = argv['dry-run'] ? true : false;
+    const pushApiHelper = new PushApiHelper(dryRun);
 
     if (argv.deleteOlderThan !== null) {
       console.log(`Deleting items older than ${argv.deleteOlderThan} hours.`);
       const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000);
       await pushApiHelper.deleteOlderThan(orderingId);
+    }
+
+    if (dryRun) {
+      deleteBuffers();
     }
 
     let stats = fs.statSync(FILE_OR_FOLDER);
@@ -59,7 +79,7 @@ async function main() {
 
       await pushApiHelper.changeStatus('REBUILD');
 
-      let pushApiBuffer = new PushApiBuffer();
+      let pushApiBuffer = new PushApiBuffer(dryRun);
       let files = fs.readdirSync(`${_dir}/${folderName}`);
 
       // consider only .json files

@@ -5,7 +5,8 @@ const PushApiHelper = require('./PushApiHelper');
 const MAX_BUFFER_SIZE = 256000000; // 256 MB is max for Push payloads.
 
 class PushApiBuffer {
-  constructor() {
+  constructor(dryRun = false) {
+    this._dryRun = dryRun;
     this.buffer = [];
     this.bufferSize = 0;
     this.bufferCount = 1;
@@ -63,18 +64,34 @@ class PushApiBuffer {
         return;
       }
 
-      const bufferName = `.buffer.${this.bufferCount}`;
-      this.getPushApiHelper()
-        .pushJsonPayload({
+      const bufferName = `.pushapi.buffer.${this.bufferCount}`;
+      if (this._dryRun) {
+        console.log(`Created buffer file (not pushing): `, bufferName);
+        fs.writeFileSync(bufferName, JSON.stringify({
           AddOrUpdate: this.buffer
-        })
-        .then(() => {
-          console.log('UPLOAD done ', bufferName);
-          this.buffer = [];
-          this.bufferSize = 0;
-          this.bufferCount++;
-          resolve();
-        });
+        }));
+
+        this.buffer = [];
+        this.bufferSize = 0;
+        this.bufferCount++;
+
+        resolve();
+
+      } else {
+
+        this.getPushApiHelper()
+          .pushJsonPayload({
+            AddOrUpdate: this.buffer
+          })
+          .then(() => {
+            console.log('UPLOAD done ', bufferName);
+            this.buffer = [];
+            this.bufferSize = 0;
+            this.bufferCount++;
+            resolve();
+          });
+
+      }
     });
   }
 }
