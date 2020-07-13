@@ -60,8 +60,8 @@ async function main() {
     const pushApiHelper = new PushApiHelper(dryRun);
 
     if (argv.deleteOlderThan !== null) {
-      console.log(`Deleting items older than ${argv.deleteOlderThan} hours.`);
-      const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000);
+      const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000) - 1;
+      console.log(`Deleting items older than ${argv.deleteOlderThan} hours (${orderingId}).`);
       await pushApiHelper.deleteOlderThan(orderingId);
     }
 
