@@ -31,7 +31,11 @@ class PushApiBuffer {
         let payload = await this.loadFile(pathToJson);
 
         if (payload instanceof Array) {
-          this.buffer.push(...payload);
+          const len = payload.length;
+          for (let i = 0; i < len; i++) {
+            this.buffer.push(payload[i]);
+          }
+          // this.buffer.push(...payload); // This fails for large files
         } else {
           this.buffer.push(payload);
         }
