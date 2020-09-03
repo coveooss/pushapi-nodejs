@@ -1,7 +1,7 @@
-/* eslint-disable no-console */
-const fs = require('fs');
-const PushApiBuffer = require('./src/PushApiBuffer');
-const PushApiHelper = require('./src/PushApiHelper');
+import fs from 'fs';
+import JsonBuffer from './src/JsonBuffer';
+import PushApi from './src/PushApi';
+import StreamApi from './src/StreamApi';
 
 
 const argv = require('yargs')
@@ -15,6 +15,9 @@ const argv = require('yargs')
   .alias('D', 'dry-run')
   .boolean('D')
   .describe('D', 'Dry run - creates the batch files, without pushing them')
+  .alias('S', 'stream')
+  .boolean('S')
+  .describe('S', 'Stream - uses the Stream api to populate a Catalog Source')
   .demandCommand(1, 'You need to specify a FILE or a FOLDER')
   .help()
   .argv;
@@ -30,10 +33,16 @@ function pushFile(file) {
   fs.readFile(file, async (err, data) => {
     if (!err) {
       try {
-        const pushApiHelper = new PushApiHelper();
-        await pushApiHelper.changeStatus('REBUILD');
-        await pushApiHelper.pushFile(JSON.parse(data));
-        await pushApiHelper.changeStatus('IDLE');
+        const payload = JSON.parse(data);
+        if (argv.stream) {
+          const streamHelper = new StreamApi();
+          await streamHelper.pushFile(payload);
+        } else {
+          const pushApiHelper = new PushApi();
+          await pushApiHelper.changeStatus('REBUILD');
+          await pushApiHelper.pushFile(payload);
+          await pushApiHelper.changeStatus('IDLE');
+        }
       } catch (e) {
         console.warn('Invalid payload.');
         console.warn(e);
@@ -57,7 +66,8 @@ function deleteBuffers() {
 async function main() {
   try {
     const dryRun = argv['dry-run'] ? true : false;
-    const pushApiHelper = new PushApiHelper(dryRun);
+    const usingStream = argv.stream ? true : false;
+    const pushApiHelper = new PushApi(dryRun);
 
     if (argv.deleteOlderThan !== null) {
       const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000) - 1;
@@ -71,6 +81,12 @@ async function main() {
 
     let stats = fs.statSync(FILE_OR_FOLDER);
     if (stats.isDirectory()) {
+
+      if (usingStream) {
+        console.warn(`Can't use stream on a folder, use a file.`);
+        return;
+      }
+
       let _dir = process.cwd();
       let folderName = FILE_OR_FOLDER;
 
@@ -79,7 +95,7 @@ async function main() {
 
       await pushApiHelper.changeStatus('REBUILD');
 
-      let pushApiBuffer = new PushApiBuffer(dryRun);
+      let pushApiBuffer = new JsonBuffer(dryRun);
       let files = fs.readdirSync(`${_dir}/${folderName}`);
 
       // consider only .json files
@@ -98,7 +114,7 @@ async function main() {
     }
 
   } catch (e) {
-    PushApiHelper.throwError(e, 10);
+    PushApi.throwError(e, 10);
   }
 }
 
