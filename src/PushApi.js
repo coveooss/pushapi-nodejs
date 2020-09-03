@@ -5,6 +5,7 @@ const PlatformRequestsHelper = require('./PlatformRequestsHelper');
 class PushApi extends PlatformRequestsHelper {
 
   async changeStatus(state) {
+    console.log(`Change source status to \x1b[33m\x1b[1m${state}\x1b[0m`, this._now());
     return this._sendRequest(`POST`, `status?statusType=${state}`);
   }
 

@@ -36,6 +36,7 @@ function pushFile(sourceConfig, file) {
           const streamHelper = new StreamApi(sourceConfig);
           await streamHelper.pushFile(payload);
         } else {
+          console.log(`\nPushing one file to source: \x1b[33m\x1b[1m${sourceConfig.source}\x1b[0m`);
           const pushApiHelper = new PushApi(sourceConfig);
           await pushApiHelper.changeStatus('REBUILD');
           await pushApiHelper.pushFile(payload);
@@ -112,6 +113,8 @@ async function main() {
     } else {
       argv.help();
     }
+
+    console.log(`\nDone\n\n`);
 
   } catch (e) {
     PushApi.throwError(e, 10);
