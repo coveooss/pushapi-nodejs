@@ -16,9 +16,6 @@ const argv = require('yargs')
   .alias('D', 'dry-run')
   .boolean('D')
   .describe('D', 'Dry run - creates the batch files, without pushing them')
-  .alias('S', 'stream')
-  .boolean('S')
-  .describe('S', 'Stream - uses the Stream api to populate a Catalog Source')
   .demandCommand(1, 'You need to specify a FILE or a FOLDER')
   .help()
   .argv;
@@ -35,7 +32,7 @@ function pushFile(sourceConfig, file) {
     if (!err) {
       try {
         const payload = JSON.parse(data);
-        if (argv.stream || sourceConfig.useStreamApi) {
+        if (sourceConfig.useStreamApi) {
           const streamHelper = new StreamApi(sourceConfig);
           await streamHelper.pushFile(payload);
         } else {
@@ -84,7 +81,7 @@ async function main() {
     let stats = fs.statSync(FILE_OR_FOLDER);
     if (stats.isDirectory()) {
 
-      if (argv.stream || sourceConfig.useStreamApi) {
+      if (sourceConfig.useStreamApi) {
         console.warn(`Can't use stream on a folder, use a file.`);
         return;
       }
