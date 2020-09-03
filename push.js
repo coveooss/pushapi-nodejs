@@ -95,6 +95,7 @@ async function main() {
       // process every .json files in the folder as separate batch requests.
       console.log(`Loading folder: ${_dir}/${folderName}`);
 
+      console.log('\nUpdate status for source: \x1b[33m \x1b[1m', sourceConfig.source, '\x1b[0m');
       await pushApiHelper.changeStatus('REBUILD');
 
       let pushApiBuffer = new JsonBuffer(dryRun);

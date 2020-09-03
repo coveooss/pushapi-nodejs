@@ -20,6 +20,13 @@ class PlatformRequestsHelper {
     console.log.apply(console, arguments);
   }
 
+  _now() {
+    let time = new Date().toLocaleTimeString('en-US', {
+      hour12: false
+    });
+    return `\x1b[94m ${time} \x1b[0m`;
+  }
+
   /**
    * Utility function to check if a key in a JSON object. The JSON payload for the Push Api is case-insensitive, so DocumentId is the same as documentid.
    * @param {string} key
@@ -57,7 +64,7 @@ class PlatformRequestsHelper {
             console.log('ERROR-msg: ', body);
             reject(error);
           } else {
-            console.log('\nREQUEST: ', method, url, response.statusCode, response.statusMessage);
+            this._debug('\nREQUEST: ', method, url, response.statusCode, response.statusMessage);
             if (response.statusCode >= 400) {
               reject(response);
             } else {
@@ -86,9 +93,7 @@ class PlatformRequestsHelper {
           console.log('ERROR 1: ', error, uploadUri);
           reject(error);
         } else {
-          console.log('Batch file sent to AWS. ', new Date().toLocaleTimeString('en-US', {
-            hour12: false
-          }));
+          console.log('File uploaded to AWS. ', this._now());
           console.log(response.statusCode, response.statusMessage);
           resolve(response);
         }

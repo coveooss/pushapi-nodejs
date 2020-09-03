@@ -8,9 +8,8 @@ class StreamApi extends PlatformRequestsHelper {
     let config = this.config;
     return this._sendRequest(`POST`, `https://api.cloud.coveo.com/push/v1/organizations/${config.org}/sources/${config.source}/stream/open`).then(
       body => {
-        console.log('openStream', typeof body);
+        console.log('\nOpen stream to source: \x1b[33m \x1b[1m', this.config.source, '\x1b[0m', this._now());
         const resp = (typeof body === 'string') ? JSON.parse(body) : body;
-        console.log('openStream', resp);
 
         this._debug('uploadUri: ', resp.uploadUri);
         this._log('streamId: ', resp.streamId);
@@ -24,7 +23,7 @@ class StreamApi extends PlatformRequestsHelper {
     let config = this.config;
     return this._sendRequest(`POST`, `https://api.cloud.coveo.com/push/v1/organizations/${config.org}/sources/${config.source}/stream/${streamInfo.streamId}/close`).then(
       body => {
-        console.log('closeStream', typeof body);
+        console.log('Close stream.', this._now(), '\n');
         let resp = (typeof body === 'string') ? JSON.parse(body) : body;
         return resp;
       }

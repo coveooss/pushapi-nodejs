@@ -18,7 +18,7 @@ class PushApi extends PlatformRequestsHelper {
     let config = this.config;
     return this._sendRequest(`POST`, `https://${config.platform}/v1/organizations/${config.org}/files`).then(
       body => {
-        console.log('getLargeFileContainer', typeof body);
+        console.log('getLargeFileContainer');
         let resp = (typeof body === 'string') ? JSON.parse(body) : body;
 
         this.uploadUri = resp.uploadUri;
