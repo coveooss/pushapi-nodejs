@@ -2,6 +2,7 @@ import fs from 'fs';
 import JsonBuffer from './src/JsonBuffer';
 import PushApi from './src/PushApi';
 import StreamApi from './src/StreamApi';
+import SourceConfig from './src/SourceConfig';
 
 
 const argv = require('yargs')
@@ -24,7 +25,7 @@ const argv = require('yargs')
 
 const FILE_OR_FOLDER = argv._[0];
 
-function pushFile(file) {
+function pushFile(sourceConfig, file) {
   console.log(`Loading file: ${file}`);
   if (argv['dry-run']) {
     console.log('DRY-RUN, not pushing.');
@@ -34,11 +35,11 @@ function pushFile(file) {
     if (!err) {
       try {
         const payload = JSON.parse(data);
-        if (argv.stream) {
-          const streamHelper = new StreamApi();
+        if (argv.stream || sourceConfig.useStreamApi) {
+          const streamHelper = new StreamApi(sourceConfig);
           await streamHelper.pushFile(payload);
         } else {
-          const pushApiHelper = new PushApi();
+          const pushApiHelper = new PushApi(sourceConfig);
           await pushApiHelper.changeStatus('REBUILD');
           await pushApiHelper.pushFile(payload);
           await pushApiHelper.changeStatus('IDLE');
@@ -66,8 +67,9 @@ function deleteBuffers() {
 async function main() {
   try {
     const dryRun = argv['dry-run'] ? true : false;
-    const usingStream = argv.stream ? true : false;
-    const pushApiHelper = new PushApi(dryRun);
+
+    const sourceConfig = new SourceConfig();
+    const pushApiHelper = new PushApi(sourceConfig, dryRun);
 
     if (argv.deleteOlderThan !== null) {
       const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000) - 1;
@@ -82,7 +84,7 @@ async function main() {
     let stats = fs.statSync(FILE_OR_FOLDER);
     if (stats.isDirectory()) {
 
-      if (usingStream) {
+      if (argv.stream || sourceConfig.useStreamApi) {
         console.warn(`Can't use stream on a folder, use a file.`);
         return;
       }
@@ -108,7 +110,7 @@ async function main() {
       await pushApiHelper.changeStatus('IDLE');
 
     } else if (stats.isFile()) {
-      pushFile(FILE_OR_FOLDER);
+      pushFile(sourceConfig, FILE_OR_FOLDER);
     } else {
       argv.help();
     }
@@ -122,50 +124,7 @@ async function main() {
 let configFile = `${process.cwd()}/.pushapi-config.json`;
 if (!fs.existsSync(configFile)) {
   console.warn(`\n\tCouldn't load ${configFile} file`);
-
-  const readline = require('readline');
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  rl.question('\nWould you like to create the config file now? [Y/n] ', (answer) => {
-    if (!answer || (/^y(es)?$/i).test(answer)) {
-      rl.question('Source ID: ', source => {
-        source = (source || '').trim();
-        const orgFromSourceId = source.split('-')[0];
-        rl.question(`Org ID: [${orgFromSourceId}]`, org => {
-          org = (org || '').trim();
-          if (!org && orgFromSourceId) {
-            org = orgFromSourceId;
-          }
-          rl.question('API key: ', apiKey => {
-            rl.close();
-            apiKey = (apiKey || '').trim();
-
-            console.log('creating file:  ', configFile);
-            let payload = {
-              org,
-              source,
-              apiKey
-            };
-            fs.writeFileSync(
-              configFile,
-              JSON.stringify(payload, 2, 2)
-            );
-
-            // eslint-disable-next-line no-octal
-            fs.chmodSync(configFile, 0600);
-
-            main();
-          });
-        });
-      });
-    } else {
-      rl.close();
-      process.exit();
-    }
-  });
+  SourceConfig.createConfig(configFile, main);
 } else {
   return main();
 }

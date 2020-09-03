@@ -4,17 +4,10 @@ import request from 'request';
 
 class PlatformRequestsHelper {
 
-  constructor(dryRun = false) {
-    this._dir = process.cwd();
+  constructor(config, dryRun = false) {
     this._dryRun = dryRun;
+    this.config = config;
 
-    try {
-      this.config = require(`${this._dir}/.pushapi-config`);
-    } catch (e) {
-      PlatformRequestsHelper.throwError(`Couldn't load .pushapi-config.json file from ${this._dir}`);
-    }
-
-    this.validateConfig();
     this._debug('\nconfig = ', this.config);
   }
 
@@ -73,11 +66,6 @@ class PlatformRequestsHelper {
     });
   }
 
-  static throwError(msg, code) {
-    console.warn(`\n\t${msg}`);
-    process.exit(code || 1);
-  }
-
   async uploadFileToAws(uploadUri, body) {
     return new Promise((resolve, reject) => {
       request({
@@ -104,25 +92,6 @@ class PlatformRequestsHelper {
         }
       });
     });
-  }
-
-  validateConfig() {
-    if (!this.config) {
-      PlatformRequestsHelper.throwError('Missing config (.pushapi-config.json)', 2);
-    }
-    if (!this.config.platform) {
-      this.config.platform = 'push.cloud.coveo.com';
-    }
-
-    if (!this.config.apiKey || this.config.apiKey === 'xx--your-api-key--abc') {
-      PlatformRequestsHelper.throwError('Missing apiKey in .pushapi-config.json', 3);
-    }
-    if (!this.config.org || this.config.org === 'your-org-id') {
-      PlatformRequestsHelper.throwError('Missing org in .pushapi-config.json', 4);
-    }
-    if (!this.config.source || this.config.source === 'your-source-id') {
-      PlatformRequestsHelper.throwError('Missing source in .pushapi-config.json', 5);
-    }
   }
 
   validatePayload(data) {
@@ -170,6 +139,10 @@ class PlatformRequestsHelper {
     return data;
   }
 
+  static throwError(msg, code) {
+    console.warn(`\n\t${msg}`);
+    process.exit(code || 1);
+  }
 }
 
 export default PlatformRequestsHelper;
