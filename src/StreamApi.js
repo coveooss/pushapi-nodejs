@@ -1,6 +1,6 @@
 'use strict';
 
-import PlatformRequestsHelper from './PlatformRequestsHelper';
+const PlatformRequestsHelper = require('./PlatformRequestsHelper');
 
 class StreamApi extends PlatformRequestsHelper {
 
@@ -46,4 +46,4 @@ class StreamApi extends PlatformRequestsHelper {
 
 }
 
-export default StreamApi;
+module.exports = StreamApi;

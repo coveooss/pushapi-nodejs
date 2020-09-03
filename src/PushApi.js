@@ -1,6 +1,6 @@
 'use strict';
 
-import PlatformRequestsHelper from './PlatformRequestsHelper';
+const PlatformRequestsHelper = require('./PlatformRequestsHelper');
 
 class PushApi extends PlatformRequestsHelper {
 
@@ -63,4 +63,4 @@ class PushApi extends PlatformRequestsHelper {
 
 }
 
-export default PushApi;
+module.exports = PushApi;

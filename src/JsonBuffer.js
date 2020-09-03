@@ -1,5 +1,4 @@
-import fs from 'fs';
-import PushApi from './PushApi';
+const fs = require('fs');
 
 const MAX_BUFFER_SIZE = 256000000; // 256 MB is max for Push payloads.
 
@@ -46,6 +45,7 @@ class JsonBuffer {
 
   getPushApi() {
     if (!this._pushapi) {
+      const PushApi = require('./PushApi');
       this._pushapi = new PushApi();
     }
     return this._pushapi;
@@ -99,4 +99,4 @@ class JsonBuffer {
   }
 }
 
-export default JsonBuffer;
+module.exports = JsonBuffer;

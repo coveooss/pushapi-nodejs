@@ -1,6 +1,5 @@
 'use strict';
-
-import request from 'request';
+const request = require('request');
 
 class PlatformRequestsHelper {
 
@@ -32,11 +31,14 @@ class PlatformRequestsHelper {
   }
 
   async _sendRequest(method, action) {
+
+    this._debug('_sendRequest::', method, action);
+
     let config = this.config,
       url = /^http/.test(action) ? action : `https://${config.platform}/v1/organizations/${config.org}/sources/${config.source}/${action}`;
 
     if (this._dryRun) {
-      // console.log('DRY-RUN: skip ', url);
+      console.log('DRY-RUN: skip ', url);
       return Promise.resolve();
     }
 
@@ -145,4 +147,4 @@ class PlatformRequestsHelper {
   }
 }
 
-export default PlatformRequestsHelper;
+module.exports = PlatformRequestsHelper;

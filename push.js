@@ -1,8 +1,8 @@
-import fs from 'fs';
-import JsonBuffer from './src/JsonBuffer';
-import PushApi from './src/PushApi';
-import StreamApi from './src/StreamApi';
-import SourceConfig from './src/SourceConfig';
+const fs = require('fs');
+const JsonBuffer = require('./src/JsonBuffer');
+const PushApi = require('./src/PushApi');
+const StreamApi = require('./src/StreamApi');
+const SourceConfig = require('./src/SourceConfig');
 
 
 const argv = require('yargs')

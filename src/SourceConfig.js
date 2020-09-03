@@ -1,4 +1,4 @@
-import fs from 'fs';
+const fs = require('fs');
 
 class SourceConfig {
 
@@ -12,6 +12,7 @@ class SourceConfig {
     }
 
     this.validateConfig();
+    return this.config;
   }
 
   validateConfig() {
@@ -33,7 +34,15 @@ class SourceConfig {
     }
   }
 
-  static createConfig(configFilePath, callback) {
+  static async ask(rl, message) {
+    return new Promise(resolve => {
+      rl.question(message, answer => {
+        resolve((answer || '').trim());
+      });
+    });
+  }
+
+  static async createConfig(configFilePath, callback) {
 
     const readline = require('readline');
     const rl = readline.createInterface({
@@ -41,42 +50,45 @@ class SourceConfig {
       output: process.stdout
     });
 
-    rl.question('\nWould you like to create the config file now? [Y/n] ', (answer) => {
-      if (!answer || (/^y(es)?$/i).test(answer)) {
-        rl.question('Source ID: ', source => {
-          source = (source || '').trim();
-          const orgFromSourceId = source.split('-')[0];
-          rl.question(`Org ID: [${orgFromSourceId}]`, org => {
-            org = (org || '').trim();
-            if (!org && orgFromSourceId) {
-              org = orgFromSourceId;
-            }
-            rl.question('API key: ', apiKey => {
-              rl.close();
-              apiKey = (apiKey || '').trim();
+    const shouldCreate = await SourceConfig.ask(rl, '\nWould you like to create the config file now? [Y/n] ');
+    if (!shouldCreate || (/^y(es)?$/i).test(shouldCreate)) {
 
-              console.log('creating file: ', configFilePath);
-              let payload = {
-                org,
-                source,
-                apiKey
-              };
-              fs.writeFileSync(
-                configFilePath,
-                JSON.stringify(payload, 2, 2)
-              );
+      let source = await SourceConfig.ask(rl, 'Source ID: ');
 
-              fs.chmodSync(configFilePath, 0o600);
+      let isCatalogSource = await SourceConfig.ask(rl, 'Is it a Catalog Source? [y/N] ');
+      isCatalogSource = (/^y(es)?$/i).test(isCatalogSource);
 
-              callback();
-            });
-          });
-        });
-      } else {
-        rl.close();
-        process.exit();
+      const orgFromSourceId = source.split('-')[0];
+      let org = await SourceConfig.ask(rl, `Org ID: [${orgFromSourceId}]`);
+      if (!org && orgFromSourceId) {
+        org = orgFromSourceId;
       }
-    });
+
+      const apiKey = await SourceConfig.ask(rl, `API key: `);
+
+      rl.close();
+      console.log('creating file: ', configFilePath);
+      let payload = {
+        org,
+        source,
+        apiKey
+      };
+      if (isCatalogSource) {
+        payload.useStreamApi = true;
+      }
+      fs.writeFileSync(
+        configFilePath,
+        JSON.stringify(payload, 2, 2)
+      );
+
+      fs.chmodSync(configFilePath, 0o600);
+
+      callback();
+    } else {
+      rl.close();
+      process.exit();
+    }
+
 
   }
 
@@ -86,4 +98,4 @@ class SourceConfig {
   }
 }
 
-export default SourceConfig;
+module.exports = SourceConfig;
