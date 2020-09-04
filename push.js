@@ -42,6 +42,7 @@ function pushFile(config, file) {
           await pushApiHelper.pushFile(payload);
           await pushApiHelper.changeStatus('IDLE');
         }
+        console.log(`\nDone\n`);
       } catch (e) {
         console.warn('Invalid payload.');
         console.warn(e);
@@ -108,13 +109,13 @@ async function main() {
 
       await pushApiHelper.changeStatus('IDLE');
 
+      console.log(`\nDone\n`);
+
     } else if (stats.isFile()) {
       pushFile(config, FILE_OR_FOLDER);
     } else {
       argv.help();
     }
-
-    console.log(`\nDone\n\n`);
 
   } catch (e) {
     PushApi.throwError(e, 10);

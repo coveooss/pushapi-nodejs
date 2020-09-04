@@ -23,7 +23,7 @@ class StreamApi extends PlatformRequestsHelper {
     let config = this.config;
     return this._sendRequest(`POST`, `https://api.cloud.coveo.com/push/v1/organizations/${config.org}/sources/${config.source}/stream/${streamInfo.streamId}/close`).then(
       body => {
-        console.log('Close stream.', this._now(), '\n');
+        console.log('Close stream.', this._now());
         let resp = (typeof body === 'string') ? JSON.parse(body) : body;
         return resp;
       }
