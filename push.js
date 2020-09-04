@@ -1,8 +1,9 @@
 const fs = require('fs');
+
+const Config = require('./src/Config');
 const JsonBuffer = require('./src/JsonBuffer');
 const PushApi = require('./src/PushApi');
 const StreamApi = require('./src/StreamApi');
-const Config = require('./src/Config');
 
 
 const argv = require('yargs')
