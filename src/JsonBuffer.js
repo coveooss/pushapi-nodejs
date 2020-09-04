@@ -1,10 +1,8 @@
-/* eslint-disable no-console */
 const fs = require('fs');
-const PushApiHelper = require('./PushApiHelper');
 
 const MAX_BUFFER_SIZE = 256000000; // 256 MB is max for Push payloads.
 
-class PushApiBuffer {
+class JsonBuffer {
   constructor(dryRun = false) {
     this._dryRun = dryRun;
     this.buffer = [];
@@ -45,11 +43,12 @@ class PushApiBuffer {
     }
   }
 
-  getPushApiHelper() {
-    if (!this._pushapihelper) {
-      this._pushapihelper = new PushApiHelper();
+  getPushApi() {
+    if (!this._pushapi) {
+      const PushApi = require('./PushApi');
+      this._pushapi = new PushApi();
     }
-    return this._pushapihelper;
+    return this._pushapi;
   }
 
   async loadFile(pathToJson) {
@@ -83,7 +82,7 @@ class PushApiBuffer {
 
       } else {
 
-        this.getPushApiHelper()
+        this.getPushApi()
           .pushJsonPayload({
             AddOrUpdate: this.buffer
           })
@@ -100,4 +99,4 @@ class PushApiBuffer {
   }
 }
 
-module.exports = PushApiBuffer;
+module.exports = JsonBuffer;
