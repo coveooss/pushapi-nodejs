@@ -15,7 +15,7 @@
     "yargs": "^15.4.1"
   },
   "devDependencies": {
-    "snyk": "^1.388.0"
+    "snyk": "^1.389.0"
   },
   "scripts": {
     "test": "snyk test",
