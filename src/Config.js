@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-class SourceConfig {
+class Config {
 
   constructor() {
     this._dir = process.cwd();
@@ -8,7 +8,7 @@ class SourceConfig {
     try {
       this.config = require(`${this._dir}/.pushapi-config`);
     } catch (e) {
-      SourceConfig.throwError(`Couldn't load .pushapi-config.json file from ${this._dir}`);
+      Config.throwError(`Couldn't load .pushapi-config.json file from ${this._dir}`);
     }
 
     this.validateConfig();
@@ -17,20 +17,20 @@ class SourceConfig {
 
   validateConfig() {
     if (!this.config) {
-      SourceConfig.throwError('Missing config (.pushapi-config.json)', 2);
+      Config.throwError('Missing config (.pushapi-config.json)', 2);
     }
     if (!this.config.platform) {
       this.config.platform = 'push.cloud.coveo.com';
     }
 
     if (!this.config.apiKey || this.config.apiKey === 'xx--your-api-key--abc') {
-      SourceConfig.throwError('Missing apiKey in .pushapi-config.json', 3);
+      Config.throwError('Missing apiKey in .pushapi-config.json', 3);
     }
     if (!this.config.org || this.config.org === 'your-org-id') {
-      SourceConfig.throwError('Missing org in .pushapi-config.json', 4);
+      Config.throwError('Missing org in .pushapi-config.json', 4);
     }
     if (!this.config.source || this.config.source === 'your-source-id') {
-      SourceConfig.throwError('Missing source in .pushapi-config.json', 5);
+      Config.throwError('Missing source in .pushapi-config.json', 5);
     }
   }
 
@@ -50,21 +50,21 @@ class SourceConfig {
       output: process.stdout
     });
 
-    const shouldCreate = await SourceConfig.ask(rl, '\nWould you like to create the config file now? [Y/n] ');
+    const shouldCreate = await Config.ask(rl, '\nWould you like to create the config file now? [Y/n] ');
     if (!shouldCreate || (/^y(es)?$/i).test(shouldCreate)) {
 
-      let source = await SourceConfig.ask(rl, 'Source ID: ');
+      let source = await Config.ask(rl, 'Source ID: ');
 
-      let isCatalogSource = await SourceConfig.ask(rl, 'Is it a Catalog Source? [y/N] ');
+      let isCatalogSource = await Config.ask(rl, 'Is it a Catalog Source? [y/N] ');
       isCatalogSource = (/^y(es)?$/i).test(isCatalogSource);
 
       const orgFromSourceId = source.split('-')[0];
-      let org = await SourceConfig.ask(rl, `Org ID: [${orgFromSourceId}]`);
+      let org = await Config.ask(rl, `Org ID: [${orgFromSourceId}]`);
       if (!org && orgFromSourceId) {
         org = orgFromSourceId;
       }
 
-      const apiKey = await SourceConfig.ask(rl, `API key: `);
+      const apiKey = await Config.ask(rl, `API key: `);
 
       rl.close();
       console.log('creating file: ', configFilePath);
@@ -98,4 +98,4 @@ class SourceConfig {
   }
 }
 
-module.exports = SourceConfig;
+module.exports = Config;
