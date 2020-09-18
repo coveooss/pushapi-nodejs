@@ -3,11 +3,18 @@ const fs = require('fs');
 const MAX_BUFFER_SIZE = 256000000; // 256 MB is max for Push payloads.
 
 class JsonBuffer {
-  constructor(dryRun = false) {
+  constructor(config, dryRun = false) {
     this._dryRun = dryRun;
     this.buffer = [];
     this.bufferSize = 0;
     this.bufferCount = 1;
+    this.config = config;
+  }
+
+  _debug() {
+    if (this.config.debug) {
+      console.debug.apply(console, arguments);
+    }
   }
 
   async addJsonFile(pathToJson) {
@@ -26,14 +33,16 @@ class JsonBuffer {
       try {
         this.bufferSize += fileSize;
 
+        this._debug('Loading file: ', pathToJson);
         let payload = await this.loadFile(pathToJson);
 
         if (payload instanceof Array) {
           const len = payload.length;
+          // Need to use for(){} here,
+          // because this.buffer.push(...payload); fails for large files
           for (let i = 0; i < len; i++) {
             this.buffer.push(payload[i]);
           }
-          // this.buffer.push(...payload); // This fails for large files
         } else {
           this.buffer.push(payload);
         }
@@ -46,7 +55,7 @@ class JsonBuffer {
   getPushApi() {
     if (!this._pushapi) {
       const PushApi = require('./PushApi');
-      this._pushapi = new PushApi();
+      this._pushapi = new PushApi(this.config);
     }
     return this._pushapi;
   }
@@ -68,6 +77,8 @@ class JsonBuffer {
       }
 
       const bufferName = `.pushapi.buffer.${this.bufferCount}`;
+      this._debug('Buffer full, sending ', bufferName);
+
       if (this._dryRun) {
         console.log(`Created buffer file (not pushing): `, bufferName);
         fs.writeFileSync(bufferName, JSON.stringify({

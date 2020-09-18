@@ -98,7 +98,7 @@ async function main() {
       console.log('\nUpdate status for source: \x1b[33m \x1b[1m', config.source, '\x1b[0m');
       await pushApiHelper.changeStatus('REBUILD');
 
-      let pushApiBuffer = new JsonBuffer(dryRun);
+      let pushApiBuffer = new JsonBuffer(config, dryRun);
       let files = fs.readdirSync(`${_dir}/${folderName}`);
 
       // consider only .json files
