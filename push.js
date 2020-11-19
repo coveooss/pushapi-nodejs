@@ -1,4 +1,6 @@
 const fs = require('fs');
+const npmview = require('npmview');
+const semver = require('semver');
 
 const Config = require('./src/Config');
 const JsonBuffer = require('./src/JsonBuffer');
@@ -64,7 +66,27 @@ function deleteBuffers() {
   console.log('');
 }
 
+function verifyVersion() {
+  try {
+    // get local package name and version from package.json (or wherever)
+    const pkgName = require('./package.json').name;
+    const pkgVersion = require('./package.json').version;
+
+    // get latest version on npm
+    npmview(pkgName, function (err, version, moduleInfo) {
+      // compare to local version
+      if (semver.gt(version, pkgVersion)) {
+        // remote version on npm is newer than current version
+        console.warn(`⚠️ There's a newer version. Consider updating using " npm install -g coveo-pushapi-cli ".`);
+      }
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 async function main() {
+
   try {
     const dryRun = argv['dry-run'] ? true : false;
 
