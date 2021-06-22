@@ -85,11 +85,6 @@ async function main() {
     let stats = fs.statSync(FILE_OR_FOLDER);
     if (stats.isDirectory()) {
 
-      if (config.useStreamApi) {
-        console.warn(`Can't use stream on a folder, use a file.`);
-        return;
-      }
-
       let _dir = process.cwd();
       let folderName = FILE_OR_FOLDER;
 
@@ -97,9 +92,18 @@ async function main() {
       console.log(`Loading folder: ${_dir}/${folderName}`);
 
       console.log('\nUpdate status for source: \x1b[33m \x1b[1m', config.source, '\x1b[0m');
-      await pushApiHelper.changeStatus('REBUILD');
+      if (!config.useStreamApi) await pushApiHelper.changeStatus('REBUILD');
 
-      let pushApiBuffer = new JsonBuffer(config, dryRun);
+      let apiHelper = null;
+      if (config.useStreamApi) {
+        apiHelper = new StreamApi(config);
+        await apiHelper.openStream();
+      }
+      else {
+        apiHelper = new PushApi(config);
+      }
+
+      let pushApiBuffer = new JsonBuffer(apiHelper, config, dryRun);
       let files = fs.readdirSync(`${_dir}/${folderName}`);
 
       // consider only .json files
@@ -109,7 +113,11 @@ async function main() {
       }
       await pushApiBuffer.sendBuffer();
 
-      await pushApiHelper.changeStatus('IDLE');
+      if (config.useStreamApi) {
+        await apiHelper.closeStream();
+      }
+
+      if (!config.useStreamApi) await pushApiHelper.changeStatus('IDLE');
 
       console.log(`\nDone\n`);
 

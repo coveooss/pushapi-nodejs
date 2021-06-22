@@ -3,8 +3,9 @@ const fs = require('fs');
 const MAX_BUFFER_SIZE = 256000000; // 256 MB is max for Push payloads.
 
 class JsonBuffer {
-  constructor(config, dryRun = false) {
+  constructor(apiHelper, config, dryRun = false) {
     this._dryRun = dryRun;
+    this.apiHelper = apiHelper;
     this.buffer = [];
     this.bufferSize = 0;
     this.bufferCount = 1;
@@ -52,14 +53,6 @@ class JsonBuffer {
     }
   }
 
-  getPushApi() {
-    if (!this._pushapi) {
-      const PushApi = require('./PushApi');
-      this._pushapi = new PushApi(this.config);
-    }
-    return this._pushapi;
-  }
-
   async loadFile(pathToJson) {
     return new Promise(resolve => {
       fs.readFile(pathToJson, (err, data) => {
@@ -93,7 +86,7 @@ class JsonBuffer {
 
       } else {
 
-        this.getPushApi()
+        this.apiHelper
           .pushJsonPayload({
             AddOrUpdate: this.buffer
           })
