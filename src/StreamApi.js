@@ -4,9 +4,13 @@ const PlatformRequestsHelper = require('./PlatformRequestsHelper');
 
 class StreamApi extends PlatformRequestsHelper {
 
+  getApiEndpoint() {
+    return this.config.platform.replace(/^push/, 'api');
+  }
+
   async openStream() {
     let config = this.config;
-    return this._sendRequest(`POST`, `https://api.cloud.coveo.com/push/v1/organizations/${config.org}/sources/${config.source}/stream/open`).then(
+    return this._sendRequest(`POST`, `https://${this.getApiEndpoint()}/push/v1/organizations/${config.org}/sources/${config.source}/stream/open`).then(
       body => {
         console.log('\nOpen stream to source: \x1b[33m \x1b[1m', this.config.source, '\x1b[0m', this._now());
         const resp = (typeof body === 'string') ? JSON.parse(body) : body;
@@ -24,7 +28,7 @@ class StreamApi extends PlatformRequestsHelper {
 
   async getChunk(streamInfo) {
     let config = this.config;
-    return this._sendRequest(`POST`, `https://api.cloud.coveo.com/push/v1/organizations/${config.org}/sources/${config.source}/stream/${this._last_streamId}/chunk`).then(
+    return this._sendRequest(`POST`, `https://${this.getApiEndpoint()}/push/v1/organizations/${config.org}/sources/${config.source}/stream/${this._last_streamId}/chunk`).then(
       body => {
         console.log('\nGet chunk for stream: \x1b[33m \x1b[1m', this.config.source, '\x1b[0m', this._now());
         const resp = (typeof body === 'string') ? JSON.parse(body) : body;
@@ -37,7 +41,7 @@ class StreamApi extends PlatformRequestsHelper {
 
   async closeStream(streamInfo) {
     let config = this.config;
-    return this._sendRequest(`POST`, `https://api.cloud.coveo.com/push/v1/organizations/${config.org}/sources/${config.source}/stream/${this._last_streamId}/close`).then(
+    return this._sendRequest(`POST`, `https://${this.getApiEndpoint()}/push/v1/organizations/${config.org}/sources/${config.source}/stream/${this._last_streamId}/close`).then(
       body => {
         console.log('Close stream.', this._now());
         let resp = (typeof body === 'string') ? JSON.parse(body) : body;

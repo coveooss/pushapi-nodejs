@@ -88,8 +88,6 @@ class Config {
       rl.close();
       process.exit();
     }
-
-
   }
 
   static throwError(msg, code) {
