@@ -47,7 +47,7 @@ function deleteBuffers() {
   console.log('');
 }
 
-async function main(FILE_OR_FOLDER) {
+async function main(FILE_OR_FOLDER, argv = { deleteOlderThan: null }) {
 
   try {
     const dryRun = argv['dry-run'] ? true : false;
@@ -106,7 +106,7 @@ async function main(FILE_OR_FOLDER) {
 
     } else if (stats.isFile()) {
       pushFile(config, FILE_OR_FOLDER, argv['dry-run'] ? true : false);
-    } else {
+    } else if (argv.help) {
       argv.help();
     }
 

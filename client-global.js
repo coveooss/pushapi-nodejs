@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const { main, Config } = require('./push.js');
-
+const fs = require('fs');
 
 const argv = require('yargs')
   .usage('\nUsage: $0 <File_or_Folder> [options]')
@@ -24,5 +24,5 @@ if (!fs.existsSync(configFile)) {
   console.warn(`\n\tCouldn't load ${configFile} file`);
   Config.createConfig(configFile, main);
 } else {
-  return main(FILE_OR_FOLDER);
+  return main(FILE_OR_FOLDER, argv);
 }
