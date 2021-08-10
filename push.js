@@ -17,7 +17,7 @@ const argv = require('yargs')
   .alias('D', 'dry-run')
   .boolean('D')
   .describe('D', 'Dry run - creates the batch files, without pushing them')
-  .demandCommand(1, 'You need to specify a FILE or a FOLDER')
+  .demandCommand(1, 'You need to specify a FILE or a FOLDER\n')
   .help()
   .argv;
 
@@ -133,10 +133,7 @@ async function main() {
 }
 
 
-let configFile = `${process.cwd()}/.pushapi-config.json`;
-if (!fs.existsSync(configFile)) {
-  console.warn(`\n\tCouldn't load ${configFile} file`);
-  Config.createConfig(configFile, main);
-} else {
-  return main();
-}
+exports.main = main;
+exports.Config = Config;
+exports.PushApi = PushApi;
+exports.StreamApi = StreamApi;
