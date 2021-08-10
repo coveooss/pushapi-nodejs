@@ -6,26 +6,9 @@ const PushApi = require('./src/PushApi');
 const StreamApi = require('./src/StreamApi');
 
 
-const argv = require('yargs')
-  .usage('\nUsage: $0 <File_or_Folder> [options]')
-  .example('$0 file1.json', 'Upload a single file to a Push Source')
-  .example('$0 folder2', 'Upload all .json files from a folder to a Push Source')
-  .example('$0 folder3 -d 2', 'Sends a deleteOlderThan 2 hours before pushing new data')
-  .alias('d', 'deleteOlderThan')
-  .default('d', null)
-  .describe('d', 'Set the deleteOlderThan delay (in hours)')
-  .alias('D', 'dry-run')
-  .boolean('D')
-  .describe('D', 'Dry run - creates the batch files, without pushing them')
-  .demandCommand(1, 'You need to specify a FILE or a FOLDER\n')
-  .help()
-  .argv;
-
-const FILE_OR_FOLDER = argv._[0];
-
-function pushFile(config, file) {
+function pushFile(config, file, dryRun = false) {
   console.log(`Loading file: ${file}`);
-  if (argv['dry-run']) {
+  if (dryRun) {
     console.log('DRY-RUN, not pushing.');
     return;
   }
@@ -64,7 +47,7 @@ function deleteBuffers() {
   console.log('');
 }
 
-async function main() {
+async function main(FILE_OR_FOLDER) {
 
   try {
     const dryRun = argv['dry-run'] ? true : false;
@@ -122,7 +105,7 @@ async function main() {
       console.log(`\nDone\n`);
 
     } else if (stats.isFile()) {
-      pushFile(config, FILE_OR_FOLDER);
+      pushFile(config, FILE_OR_FOLDER, argv['dry-run'] ? true : false);
     } else {
       argv.help();
     }
