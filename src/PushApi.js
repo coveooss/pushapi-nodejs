@@ -51,8 +51,8 @@ class PushApi extends PlatformRequestsHelper {
       await this.uploadFileToAws(this.uploadUri, data);
       await this.sendBatchRequest();
     } catch (err) {
-      console.error('\n\nERROR: ', );
-      console.error(err.statusCode, err.statusMessage);
+      console.error('\n\nERROR: ');
+      console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
       console.error(err.body);
       console.error('\n\n');
     }

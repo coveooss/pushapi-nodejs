@@ -22,7 +22,7 @@ const FILE_OR_FOLDER = argv._[0];
 let configFile = `${process.cwd()}/.pushapi-config.json`;
 if (!fs.existsSync(configFile)) {
   console.warn(`\n\tCouldn't load ${configFile} file`);
-  Config.createConfig(configFile, main);
+  Config.createConfig(configFile, () => main(FILE_OR_FOLDER, argv));
 } else {
   return main(FILE_OR_FOLDER, argv);
 }

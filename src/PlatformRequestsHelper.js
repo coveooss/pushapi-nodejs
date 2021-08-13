@@ -51,20 +51,21 @@ class PlatformRequestsHelper {
 
     return new Promise((resolve, reject) => {
       request({
-          method: method,
-          url: url,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${config.apiKey}`,
-          },
+        method: method,
+        url: url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`,
         },
+      },
         (error, response, body) => {
           if (error) {
-            console.log('ERROR: ', error, response.statusCode, url);
+            console.log('ERROR: ', error);
+            console.log('response: ', response && response.statusCode, url);
             console.log('ERROR-msg: ', body);
             reject(error);
           } else {
-            this._debug('\nREQUEST: ', method, url, response.statusCode, response.statusMessage);
+            this._debug('\nREQUEST: ', method, url, response && response.statusCode, response && response.statusMessage);
             if (response.statusCode >= 400) {
               reject(response);
             } else {

@@ -81,9 +81,8 @@ class StreamApi extends PlatformRequestsHelper {
       this._last_uploadUri = null;
     } catch (err) {
       console.error('\n\nStreamApi ERROR: ',);
-      console.error(err.statusCode, err.statusMessage);
-      console.error(err.body);
-      console.error(err);
+      console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
+      console.error(err.body || err);
       console.error('\n\n');
     }
   }

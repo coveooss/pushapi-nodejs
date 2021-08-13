@@ -78,12 +78,18 @@ async function main(FILE_OR_FOLDER, argv = { deleteOlderThan: null }) {
       if (!config.useStreamApi) await pushApiHelper.changeStatus('REBUILD');
 
       let apiHelper = null;
-      if (config.useStreamApi) {
-        apiHelper = new StreamApi(config);
-        await apiHelper.openStream();
+      try {
+        if (config.useStreamApi) {
+          apiHelper = new StreamApi(config);
+          await apiHelper.openStream();
+        }
+        else {
+          apiHelper = new PushApi(config);
+        }
       }
-      else {
-        apiHelper = new PushApi(config);
+      catch (err) {
+        console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
+        console.error(err.body || err);
       }
 
       let pushApiBuffer = new JsonBuffer(apiHelper, config, dryRun);
@@ -97,7 +103,13 @@ async function main(FILE_OR_FOLDER, argv = { deleteOlderThan: null }) {
       await pushApiBuffer.sendBuffer();
 
       if (config.useStreamApi) {
-        await apiHelper.closeStream();
+        try {
+          await apiHelper.closeStream();
+        }
+        catch (err) {
+          console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
+          console.error(err.body || err);
+        }
       }
 
       if (!config.useStreamApi) await pushApiHelper.changeStatus('IDLE');
