@@ -16,6 +16,13 @@ function pushFile(config, file, dryRun = false) {
     if (!err) {
       try {
         const payload = JSON.parse(data);
+
+        // quick validation of the payload
+
+        if (!payload || !(payload instanceof Array) || !payload.AddOrUpdate || !payload.addOrUpdate) {
+          console.warn(`\n\t !! Your payload seems to be in a wrong format !!\n\n\tMissing \x1b[33m\x1b[1m{ "AddOrUpdate": [] }\x1b[0m around your data?\n\n`);
+        }
+
         if (config.useStreamApi) {
           const streamHelper = new StreamApi(config);
           await streamHelper.pushFile(payload);

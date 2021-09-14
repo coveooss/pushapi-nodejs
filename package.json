@@ -1,6 +1,6 @@
 {
   "name": "coveo-pushapi-cli",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Command line tool to push JSON payloads to the Coveo Cloud using the PushAPI",
   "main": "push.js",
   "keywords": [
