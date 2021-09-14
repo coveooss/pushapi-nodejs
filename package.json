@@ -12,10 +12,10 @@
   ],
   "dependencies": {
     "request": "^2.88.2",
-    "yargs": "^17.1.0"
+    "yargs": "^17.1.1"
   },
   "devDependencies": {
-    "snyk": "^1.680.0"
+    "snyk": "^1.713.0"
   },
   "scripts": {
     "test": "snyk test",
