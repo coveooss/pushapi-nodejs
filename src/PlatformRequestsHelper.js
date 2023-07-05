@@ -1,5 +1,5 @@
 'use strict';
-const request = require('request');
+const https = require('https');
 
 class PlatformRequestsHelper {
 
@@ -33,7 +33,7 @@ class PlatformRequestsHelper {
    * @param {Object} obj
    */
   _isKeyMissingInObject(key, obj) {
-    let keys = Object.keys(obj).map(k => k.toLowerCase());
+    const keys = Object.keys(obj).map(k => k.toLowerCase());
     return !(keys.includes(key.toLowerCase()));
   }
 
@@ -41,64 +41,90 @@ class PlatformRequestsHelper {
 
     this._debug('_sendRequest::', method, action);
 
-    let config = this.config,
-      url = /^http/.test(action) ? action : `https://${config.platform}/v1/organizations/${config.org}/sources/${config.source}/${action}`;
+    const config = this.config;
+    let path = `/v1/organizations/${config.org}/sources/${config.source}/${action}`;
+
+    if (/^http/.test(action)) {
+      path = action.split('://')[1].replace(/^[^/]*\/?/, '/');
+    }
 
     if (this._dryRun) {
-      console.log('DRY-RUN: skip ', url);
+      console.log('DRY-RUN: skip ');
       return Promise.resolve();
     }
 
     return new Promise((resolve, reject) => {
-      request({
+      const options = {
         method: method,
-        url: url,
+        hostname: config.platform,
+        path,
+        port: 443,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`,
         },
-      },
-        (error, response, body) => {
-          if (error) {
-            console.log('ERROR: ', error);
-            console.log('response: ', response && response.statusCode, url);
-            console.log('ERROR-msg: ', body);
-            reject(error);
-          } else {
-            this._debug('\nREQUEST: ', method, url, response && response.statusCode, response && response.statusMessage);
-            if (response.statusCode >= 400) {
-              reject(response);
+      };
+
+      const req = https.request(options,
+        (resp) => {
+          this._debug('statusCode:', resp.statusCode);
+          this._debug('headers:', resp.headers);
+
+          let data = "";
+          resp.on("data", chunk => {
+            data += chunk;
+          });
+          resp.on("end", () => {
+            this._debug('\nREQUEST: ', method, resp.statusCode, data);
+            if (resp.statusCode >= 400) {
+              reject(resp);
             } else {
-              resolve(body);
+              resolve(data);
             }
-          }
+          });
         });
+      req.on('error', (err) => {
+        console.log('ERROR: ', err);
+        reject(err);
+      });
+      req.end();
     });
   }
 
   async uploadFileToAws(uploadUri, body) {
+    const url = new URL(uploadUri);
+    const path = uploadUri.split('://')[1].replace(/^[^/]*\/?/, '/');
+
     return new Promise((resolve, reject) => {
-      request({
+      const postData = JSON.stringify(body);
+      const options = {
         method: 'PUT',
-        url: uploadUri,
+        hostname: url.hostname,
+        path,
+        port: 443,
         headers: {
           'Content-Type': 'application/octet-stream',
+          'Content-Length': postData.length,
           'x-amz-server-side-encryption': 'AES256'
         },
         maxContentLength: 256000000, // 256 MB
         maxBodyLength: 256000000,
-        body,
         json: true,
-      }, (error, response) => {
-        if (error) {
-          console.log('ERROR 1: ', error, uploadUri);
-          reject(error);
-        } else {
-          console.log('File uploaded to AWS. ', this._now());
-          console.log(response.statusCode, response.statusMessage);
-          resolve(response);
-        }
+      };
+      this._debug('\n\nuploadFileToAws:\n', options);
+
+      const req = https.request(options, (response) => {
+        console.log('File uploaded to AWS. ', this._now());
+        this._debug(response.statusCode, response.statusMessage);
+        resolve(response);
       });
+
+      req.on('error', (error) => {
+        console.log('ERROR 1: ', error, uploadUri);
+        reject(error);
+      });
+      req.write(postData);
+      req.end();
     });
   }
 
