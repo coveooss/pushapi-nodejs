@@ -37,7 +37,7 @@ The first time you run in one folder, it will help you to set up your config `.p
 
   `pushapi file.json`
 
-  where `file.json` is a the path to a Push API payload (JSON) file. Don't forget to set `DocumentId` in the payloads.
+  where `file.json` is the path to a Push API payload (JSON) file. Don't forget to set `DocumentId` in the payloads.
 
 - Push one JSON payload file, but delete source item older than 24 hours:
 
