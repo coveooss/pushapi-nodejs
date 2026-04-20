@@ -49,7 +49,11 @@ The first time you run in one folder, it will help you to set up your config `.p
 
   `pushapi folder`
 
-  where `folder` is teh path to a folder containing multiple Push API JSON payload files.
+  where `folder` is the path to a folder containing multiple Push API JSON payload files.
+  Folder uploads accept a mix of these JSON formats in the same folder:
+  - an array of items
+  - a Push API payload with `AddOrUpdate`
+  - a single item object
 
 ## What does it do?
 

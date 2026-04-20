@@ -9,6 +9,7 @@ class JsonBuffer {
     this.buffer = [];
     this.bufferSize = 0;
     this.bufferCount = 1;
+    this.totalItemCount = 0;
     this.config = config;
   }
 
@@ -16,6 +17,24 @@ class JsonBuffer {
     if (this.config.debug) {
       console.debug.apply(console, arguments);
     }
+  }
+
+  normalizePayloadItems(payload, pathToJson) {
+    if (payload instanceof Array) {
+      return payload;
+    }
+
+    if (payload && typeof payload === 'object') {
+      const addOrUpdateKey = Object.keys(payload).find(key => key.toLowerCase() === 'addorupdate');
+      if (addOrUpdateKey) {
+        if (!(payload[addOrUpdateKey] instanceof Array)) {
+          throw new Error(`Invalid payload in ${pathToJson}: AddOrUpdate must be an array.`);
+        }
+        return payload[addOrUpdateKey];
+      }
+    }
+
+    return [payload];
   }
 
   async addJsonFile(pathToJson) {
@@ -33,17 +52,15 @@ class JsonBuffer {
     } else {
       this._debug('Loading file: ', pathToJson);
       let payload = await this.loadFile(pathToJson);
+      const items = this.normalizePayloadItems(payload, pathToJson);
       this.bufferSize += fileSize;
 
-      if (payload instanceof Array) {
-        const len = payload.length;
-        // Need to use for(){} here,
-        // because this.buffer.push(...payload); fails for large files
-        for (let i = 0; i < len; i++) {
-          this.buffer.push(payload[i]);
-        }
-      } else {
-        this.buffer.push(payload);
+      const len = items.length;
+      this.totalItemCount += len;
+      // Need to use for(){} here,
+      // because this.buffer.push(...items); fails for large files
+      for (let i = 0; i < len; i++) {
+        this.buffer.push(items[i]);
       }
     }
   }

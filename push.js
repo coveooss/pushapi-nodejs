@@ -50,6 +50,26 @@ function reportError(error) {
   console.error(error);
 }
 
+function countPayloadItems(payload) {
+  if (!payload) {
+    return 0;
+  }
+
+  if (payload instanceof Array) {
+    return payload.length;
+  }
+
+  if (payload.AddOrUpdate instanceof Array) {
+    return payload.AddOrUpdate.length;
+  }
+
+  if (payload.addOrUpdate instanceof Array) {
+    return payload.addOrUpdate.length;
+  }
+
+  return 1;
+}
+
 async function pushFile(config, file, dryRun = false) {
   console.log(`Loading file: ${file}`);
   if (dryRun) {
@@ -66,6 +86,7 @@ async function pushFile(config, file, dryRun = false) {
     }
     throw error;
   }
+  const itemCount = countPayloadItems(payload);
 
   // quick validation of the payload
   if (!payload || (!(payload instanceof Array) && !payload.AddOrUpdate && !payload.addOrUpdate)) {
@@ -81,6 +102,7 @@ async function pushFile(config, file, dryRun = false) {
     await runWithSourceInRebuild(pushApiHelper, () => pushApiHelper.pushFile(payload));
   }
 
+  console.log(`Processed items: ${itemCount}`);
   console.log(`\nDone\n`);
 }
 
@@ -141,6 +163,7 @@ async function main(FILE_OR_FOLDER, argv = { deleteOlderThan: null }) {
             await pushApiBuffer.addJsonFile(`${_dir}/${folderName}/${fileName}`);
           }
           await pushApiBuffer.sendBuffer();
+          console.log(`Processed items: ${pushApiBuffer.totalItemCount}`);
         } finally {
           if (config.useStreamApi && apiHelper) {
             await apiHelper.closeStream();
