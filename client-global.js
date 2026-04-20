@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 const { main, Config } = require('./push.js');
 const fs = require('fs');
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
 
-const argv = require('yargs')
+const argv = yargs(hideBin(process.argv))
   .usage('\nUsage: $0 <File_or_Folder> [options]')
   .example('$0 file1.json', 'Upload a single file to a Push Source')
   .example('$0 folder2', 'Upload all .json files from a folder to a Push Source')
@@ -15,7 +17,7 @@ const argv = require('yargs')
   .describe('D', 'Dry run - creates the batch files, without pushing them')
   .demandCommand(1, 'You need to specify a FILE or a FOLDER\n')
   .help()
-  .argv;
+  .parse();
 
 const FILE_OR_FOLDER = argv._[0];
 
