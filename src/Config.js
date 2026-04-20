@@ -67,7 +67,7 @@ class Config {
         console.warn("Invalid platform, defaulting to prod");
         platform = "";
       }
-      this.config.platform = `push${platform || ""}.cloud.coveo.com`;
+      const platformHost = `push${platform || ""}.cloud.coveo.com`;
 
       const apiKey = await Config.ask(rl, `API key: `);
 
@@ -77,15 +77,16 @@ class Config {
         org,
         source,
         apiKey,
+        platform: platformHost,
       };
       if (isCatalogSource) {
         payload.useStreamApi = true;
       }
-      fs.writeFileSync(configFilePath, JSON.stringify(payload, 2, 2));
+      fs.writeFileSync(configFilePath, JSON.stringify(payload, null, 2));
 
       fs.chmodSync(configFilePath, 0o600);
 
-      callback();
+      await callback();
     } else {
       rl.close();
       process.exit();
