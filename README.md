@@ -43,7 +43,7 @@ The first time you run in one folder, it will help you to set up your config `.p
 
   `pushapi file.json -d 24`
 
-  to use typically when you create/update all valid items, you want to delete all othere items that are older.
+  to use typically when you create/update all valid items, you want to delete all other items that are older.
 
 - Push all JSON payload files from one folder:
 
