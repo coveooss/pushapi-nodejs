@@ -6,43 +6,82 @@ const PushApi = require('./src/PushApi');
 const StreamApi = require('./src/StreamApi');
 
 
-function pushFile(config, file, dryRun = false) {
+async function runWithSourceInRebuild(pushApiHelper, work) {
+  let statusChanged = false;
+  let result;
+  let workError = null;
+
+  await pushApiHelper.changeStatus('REBUILD');
+  statusChanged = true;
+
+  try {
+    result = await work();
+  } catch (error) {
+    workError = error;
+  }
+
+  if (statusChanged) {
+    try {
+      await pushApiHelper.changeStatus('IDLE');
+    } catch (statusError) {
+      if (workError) {
+        statusError.cause = workError;
+      }
+      throw statusError;
+    }
+  }
+
+  if (workError) {
+    throw workError;
+  }
+
+  return result;
+}
+
+function reportError(error) {
+  if (error && error.statusCode) {
+    console.error(error.message);
+    if (error.body) {
+      console.error(error.body);
+    }
+    return;
+  }
+
+  console.error(error);
+}
+
+async function pushFile(config, file, dryRun = false) {
   console.log(`Loading file: ${file}`);
   if (dryRun) {
     console.log('DRY-RUN, not pushing.');
     return;
   }
-  fs.readFile(file, async (err, data) => {
-    if (!err) {
-      try {
-        const payload = JSON.parse(data);
 
-        // quick validation of the payload
-
-        if (!payload || (!(payload instanceof Array) && !payload.AddOrUpdate && !payload.addOrUpdate)) {
-          console.warn(`\n\t !! Your payload seems to be in a wrong format !!\n\n\tMissing \x1b[33m\x1b[1m{ "AddOrUpdate": [] }\x1b[0m around your data?\n\n`);
-        }
-
-        if (config.useStreamApi) {
-          const streamHelper = new StreamApi(config);
-          await streamHelper.pushFile(payload);
-        } else {
-          console.log(`\nPushing one file to source: \x1b[33m\x1b[1m${config.source}\x1b[0m`);
-          const pushApiHelper = new PushApi(config);
-          await pushApiHelper.changeStatus('REBUILD');
-          await pushApiHelper.pushFile(payload);
-          await pushApiHelper.changeStatus('IDLE');
-        }
-        console.log(`\nDone\n`);
-      } catch (e) {
-        console.warn('Invalid payload.');
-        console.warn(e);
-        return;
-      }
-    } else {
-      console.log(`\nCouldn't read file "${file}": \n\t`, err);
+  let payload;
+  try {
+    payload = JSON.parse(await fs.promises.readFile(file, 'utf8'));
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      error.message = `Invalid JSON in ${file}: ${error.message}`;
     }
-  });
+    throw error;
+  }
+
+  // quick validation of the payload
+  if (!payload || (!(payload instanceof Array) && !payload.AddOrUpdate && !payload.addOrUpdate)) {
+    console.warn(`\n\t !! Your payload seems to be in a wrong format !!\n\n\tMissing \x1b[33m\x1b[1m{ "AddOrUpdate": [] }\x1b[0m around your data?\n\n`);
+  }
+
+  if (config.useStreamApi) {
+    const streamHelper = new StreamApi(config);
+    await streamHelper.pushFile(payload);
+  } else {
+    console.log(`\nPushing one file to source: \x1b[33m\x1b[1m${config.source}\x1b[0m`);
+    const pushApiHelper = new PushApi(config);
+    await runWithSourceInRebuild(pushApiHelper, () => pushApiHelper.pushFile(payload));
+  }
+
+  console.log(`\nDone\n`);
 }
 
 function deleteBuffers() {
@@ -82,10 +121,8 @@ async function main(FILE_OR_FOLDER, argv = { deleteOlderThan: null }) {
       console.log(`Loading folder: ${_dir}/${folderName}`);
 
       console.log('\nUpdate status for source: \x1b[33m \x1b[1m', config.source, '\x1b[0m');
-      if (!config.useStreamApi) await pushApiHelper.changeStatus('REBUILD');
-
-      let apiHelper = null;
-      try {
+      const pushFolder = async () => {
+        let apiHelper = null;
         if (config.useStreamApi) {
           apiHelper = new StreamApi(config);
           await apiHelper.openStream();
@@ -93,44 +130,41 @@ async function main(FILE_OR_FOLDER, argv = { deleteOlderThan: null }) {
         else {
           apiHelper = new PushApi(config);
         }
-      }
-      catch (err) {
-        console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
-        console.error(err.body || err);
-      }
 
-      let pushApiBuffer = new JsonBuffer(apiHelper, config, dryRun);
-      let files = fs.readdirSync(`${_dir}/${folderName}`);
+        try {
+          let pushApiBuffer = new JsonBuffer(apiHelper, config, dryRun);
+          let files = fs.readdirSync(`${_dir}/${folderName}`);
 
-      // consider only .json files
-      files = files.filter(fileName => (/\.json$/.test(fileName)));
-      for (let fileName of files) {
-        await pushApiBuffer.addJsonFile(`${_dir}/${folderName}/${fileName}`);
-      }
-      await pushApiBuffer.sendBuffer();
+          // consider only .json files
+          files = files.filter(fileName => (/\.json$/.test(fileName)));
+          for (let fileName of files) {
+            await pushApiBuffer.addJsonFile(`${_dir}/${folderName}/${fileName}`);
+          }
+          await pushApiBuffer.sendBuffer();
+        } finally {
+          if (config.useStreamApi && apiHelper) {
+            await apiHelper.closeStream();
+          }
+        }
+      };
 
       if (config.useStreamApi) {
-        try {
-          await apiHelper.closeStream();
-        }
-        catch (err) {
-          console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
-          console.error(err.body || err);
-        }
+        await pushFolder();
+      } else {
+        await runWithSourceInRebuild(pushApiHelper, pushFolder);
       }
-
-      if (!config.useStreamApi) await pushApiHelper.changeStatus('IDLE');
 
       console.log(`\nDone\n`);
 
     } else if (stats.isFile()) {
-      pushFile(config, FILE_OR_FOLDER, argv['dry-run'] ? true : false);
+      await pushFile(config, FILE_OR_FOLDER, argv['dry-run'] ? true : false);
     } else if (argv.help) {
       argv.help();
     }
 
   } catch (e) {
-    PushApi.throwError(e, 10);
+    reportError(e);
+    process.exit(10);
   }
 }
 

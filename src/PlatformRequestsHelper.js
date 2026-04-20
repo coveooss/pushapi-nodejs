@@ -37,15 +37,27 @@ class PlatformRequestsHelper {
     return !(keys.includes(key.toLowerCase()));
   }
 
+  _buildHttpError(response, body, context) {
+    const error = new Error(`${context} failed with status ${response.statusCode}${response.statusMessage ? ` ${response.statusMessage}` : ''}`);
+    error.statusCode = response.statusCode;
+    error.statusMessage = response.statusMessage;
+    error.body = body;
+    error.req = response.req;
+    return error;
+  }
+
   async _sendRequest(method, action) {
 
     this._debug('_sendRequest::', method, action);
 
     const config = this.config;
+    let hostname = config.platform;
     let path = `/v1/organizations/${config.org}/sources/${config.source}/${action}`;
 
     if (/^http/.test(action)) {
-      path = action.split('://')[1].replace(/^[^/]*\/?/, '/');
+      const url = new URL(action);
+      hostname = url.hostname;
+      path = `${url.pathname}${url.search}`;
     }
 
     if (this._dryRun) {
@@ -56,7 +68,7 @@ class PlatformRequestsHelper {
     return new Promise((resolve, reject) => {
       const options = {
         method: method,
-        hostname: config.platform,
+        hostname,
         path,
         port: 443,
         headers: {
@@ -77,7 +89,7 @@ class PlatformRequestsHelper {
           resp.on("end", () => {
             this._debug('\nREQUEST: ', method, resp.statusCode, data);
             if (resp.statusCode >= 400) {
-              reject(resp);
+              reject(this._buildHttpError(resp, data, `${method} ${hostname}${path}`));
             } else {
               resolve(data);
             }
@@ -93,7 +105,7 @@ class PlatformRequestsHelper {
 
   async uploadFileToAws(uploadUri, body) {
     const url = new URL(uploadUri);
-    const path = uploadUri.split('://')[1].replace(/^[^/]*\/?/, '/');
+    const path = `${url.pathname}${url.search}`;
 
     return new Promise((resolve, reject) => {
       const postData = JSON.stringify(body);
@@ -104,19 +116,26 @@ class PlatformRequestsHelper {
         port: 443,
         headers: {
           'Content-Type': 'application/octet-stream',
-          'Content-Length': postData.length,
+          'Content-Length': Buffer.byteLength(postData),
           'x-amz-server-side-encryption': 'AES256'
         },
-        maxContentLength: 256000000, // 256 MB
-        maxBodyLength: 256000000,
-        json: true,
       };
       this._debug('\n\nuploadFileToAws:\n', options);
 
       const req = https.request(options, (response) => {
-        console.log('File uploaded to AWS. ', this._now());
-        this._debug(response.statusCode, response.statusMessage);
-        resolve(response);
+        let data = "";
+        response.on('data', chunk => {
+          data += chunk;
+        });
+        response.on('end', () => {
+          this._debug(response.statusCode, response.statusMessage);
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            console.log('File uploaded to AWS. ', this._now());
+            resolve(response);
+          } else {
+            reject(this._buildHttpError(response, data, `PUT ${url.hostname}${path}`));
+          }
+        });
       });
 
       req.on('error', (error) => {

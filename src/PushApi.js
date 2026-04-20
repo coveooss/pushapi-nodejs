@@ -45,17 +45,9 @@ class PushApi extends PlatformRequestsHelper {
       return;
     }
 
-    // push
-    try {
-      await this.getLargeFileContainer();
-      await this.uploadFileToAws(this.uploadUri, data);
-      await this.sendBatchRequest();
-    } catch (err) {
-      console.error('\n\nERROR: ');
-      console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
-      console.error(err.body);
-      console.error('\n\n');
-    }
+    await this.getLargeFileContainer();
+    await this.uploadFileToAws(this.uploadUri, data);
+    await this.sendBatchRequest();
   }
 
   async sendBatchRequest(fileId) {

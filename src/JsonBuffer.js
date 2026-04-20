@@ -31,75 +31,67 @@ class JsonBuffer {
       await this.sendBuffer();
       await this.addJsonFile(pathToJson);
     } else {
-      try {
-        this.bufferSize += fileSize;
+      this._debug('Loading file: ', pathToJson);
+      let payload = await this.loadFile(pathToJson);
+      this.bufferSize += fileSize;
 
-        this._debug('Loading file: ', pathToJson);
-        let payload = await this.loadFile(pathToJson);
-
-        if (payload instanceof Array) {
-          const len = payload.length;
-          // Need to use for(){} here,
-          // because this.buffer.push(...payload); fails for large files
-          for (let i = 0; i < len; i++) {
-            this.buffer.push(payload[i]);
-          }
-        } else {
-          this.buffer.push(payload);
+      if (payload instanceof Array) {
+        const len = payload.length;
+        // Need to use for(){} here,
+        // because this.buffer.push(...payload); fails for large files
+        for (let i = 0; i < len; i++) {
+          this.buffer.push(payload[i]);
         }
-      } catch (e) {
-        console.log(e);
+      } else {
+        this.buffer.push(payload);
       }
     }
   }
 
   async loadFile(pathToJson) {
-    return new Promise(resolve => {
-      fs.readFile(pathToJson, (err, data) => {
-        resolve(JSON.parse(data));
+    return new Promise((resolve, reject) => {
+      fs.readFile(pathToJson, 'utf8', (err, data) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        try {
+          resolve(JSON.parse(data));
+        } catch (error) {
+          error.message = `Invalid JSON in ${pathToJson}: ${error.message}`;
+          reject(error);
+        }
       });
     });
   }
 
   async sendBuffer() {
-    return new Promise((resolve) => {
+    if (this.bufferSize <= 0) {
+      return;
+    }
 
-      if (this.bufferSize <= 0) {
-        resolve();
-        return;
-      }
+    const bufferName = `.pushapi.buffer.${this.bufferCount}`;
+    this._debug('Buffer full, sending ', bufferName);
 
-      const bufferName = `.pushapi.buffer.${this.bufferCount}`;
-      this._debug('Buffer full, sending ', bufferName);
+    if (this._dryRun) {
+      console.log(`Created buffer file (not pushing): `, bufferName);
+      fs.writeFileSync(bufferName, JSON.stringify({
+        AddOrUpdate: this.buffer
+      }));
 
-      if (this._dryRun) {
-        console.log(`Created buffer file (not pushing): `, bufferName);
-        fs.writeFileSync(bufferName, JSON.stringify({
-          AddOrUpdate: this.buffer
-        }));
+      this.buffer = [];
+      this.bufferSize = 0;
+      this.bufferCount++;
+      return;
+    }
 
-        this.buffer = [];
-        this.bufferSize = 0;
-        this.bufferCount++;
-
-        resolve();
-
-      } else {
-
-        this.apiHelper
-          .pushJsonPayload({
-            AddOrUpdate: this.buffer
-          })
-          .then(() => {
-            console.log('UPLOAD done ', bufferName);
-            this.buffer = [];
-            this.bufferSize = 0;
-            this.bufferCount++;
-            resolve();
-          });
-
-      }
+    await this.apiHelper.pushJsonPayload({
+      AddOrUpdate: this.buffer
     });
+    console.log('UPLOAD done ', bufferName);
+    this.buffer = [];
+    this.bufferSize = 0;
+    this.bufferCount++;
   }
 }
 
