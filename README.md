@@ -33,28 +33,23 @@ npm i coveo-pushapi-cli --global
 
 The first time you run in one folder, it will help you to set up your config `.pushapi-config.json` by asking about your `sourceId` and your `API key`.
 
-> **Note**
-> For a source in a Coveo Cloud HIPAA org, you need to manually add the following line to the `.pushapi-config.json` file:
->
-> `"platform": "pushhipaa.cloud.coveo.com"`.
-
 - Push one JSON payload file:
 
-    `pushapi file.json`
+  `pushapi file.json`
 
-    where `file.json` is a the path to a Push API payload (JSON) file. Don't forget to set `DocumentId` in the payloads.
+  where `file.json` is a the path to a Push API payload (JSON) file. Don't forget to set `DocumentId` in the payloads.
 
 - Push one JSON payload file, but delete source item older than 24 hours:
 
-    `pushapi file.json -d 24`
+  `pushapi file.json -d 24`
 
-    to use typically when you create/update all valid items, you want to delete all othere items that are older. 
+  to use typically when you create/update all valid items, you want to delete all othere items that are older.
 
 - Push all JSON payload files from one folder:
 
-    `pushapi folder`
+  `pushapi folder`
 
-    where `folder` is teh path to a folder containing multiple Push API JSON payload files.
+  where `folder` is teh path to a folder containing multiple Push API JSON payload files.
 
 ## What does it do?
 
@@ -67,7 +62,7 @@ The helper does a minimal validation on the payload, then executes these API cal
 5. Change the source state back to IDLE
 
 > **Note**
-> You can add this attribute `"debug": true` in your `.pushapi-config.json` to see these requests and their response code.
+>  You can add this attribute `"debug": true` in your `.pushapi-config.json` to see these requests and their response code.
 
 ## Dependencies
 
