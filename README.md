@@ -66,7 +66,7 @@ The helper does a minimal validation on the payload, then executes these API cal
 5. Change the source state back to IDLE
 
 > **Note**
->  You can add this attribute `"debug": true` in your `.pushapi-config.json` to see these requests and their response code.
+> You can add this attribute `"debug": true` in your `.pushapi-config.json` to see these requests and their response code.
 
 ## Dependencies
 
