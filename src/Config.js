@@ -62,9 +62,13 @@ class Config {
       }
 
       let platform = await Config.ask(rl, "Platform: (empty for prod) [dev, stg, hipaa]");
+      platform = platform.toLowerCase();
       // validate platform input
-      if (platform && !/^(dev|stg|hipaa)$/.test(platform)) {
+      if (platform && !/^(dev|stg|hipaa|prod)$/.test(platform)) {
         console.warn("Invalid platform, defaulting to prod");
+        platform = "";
+      }
+      if (platform === "prod") {
         platform = "";
       }
       const platformHost = `push${platform || ""}.cloud.coveo.com`;
