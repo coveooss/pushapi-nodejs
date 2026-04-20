@@ -8,7 +8,7 @@ This project is a simple wrapper to help sending JSON payloads using Coveo Cloud
 
 The code in this project uses the Push API from the Coveo Cloud V2 Platform. You can use the following resource for more information and get started:
 
-- Push API documentation: https://docs.coveo.com/en/68/cloud-v2-developers/push-api
+- Push API documentation: [Use the Push API](https://docs.coveo.com/en/68/cloud-v2-developers/push-api)
 
 ## Contributing
 
@@ -25,7 +25,7 @@ The code in this project uses the Push API from the Coveo Cloud V2 Platform. You
 
 Install it with NPM:
 
-```
+```bash
 npm i coveo-pushapi-cli --global
 ```
 
@@ -75,4 +75,4 @@ The helper does a minimal validation on the payload, then executes these API cal
 
 ## Authors
 
-- Jérôme Devost (https://github.com/jdevost)
+- Jérôme Devost ([GitHub profile](https://github.com/jdevost))
