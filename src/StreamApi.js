@@ -54,8 +54,11 @@ class StreamApi extends PlatformRequestsHelper {
     data = this.validatePayload(data);
 
     const streamInfo = await this.openStream();
-    await this.uploadFileToAws(streamInfo.uploadUri, data);
-    await this.closeStream(streamInfo);
+    try {
+      await this.uploadFileToAws(streamInfo.uploadUri, data);
+    } finally {
+      await this.closeStream(streamInfo);
+    }
   }
 
   static throwError(msg, code) {
@@ -69,22 +72,14 @@ class StreamApi extends PlatformRequestsHelper {
       return;
     }
 
-    // push
-    try {
-      let uploadUri = this._last_uploadUri;
-      if (!uploadUri) {
-        const chunkResponse = await this.getChunk();
-        this._debug('chunkResponse: ', chunkResponse);
-        uploadUri = chunkResponse.uploadUri;
-      }
-      await this.uploadFileToAws(uploadUri, data);
-      this._last_uploadUri = null;
-    } catch (err) {
-      console.error('\n\nStreamApi ERROR: ',);
-      console.error(err.statusCode, err.statusMessage, (err.req && err.req.path || ''));
-      console.error(err.body || err);
-      console.error('\n\n');
+    let uploadUri = this._last_uploadUri;
+    if (!uploadUri) {
+      const chunkResponse = await this.getChunk();
+      this._debug('chunkResponse: ', chunkResponse);
+      uploadUri = chunkResponse.uploadUri;
     }
+    await this.uploadFileToAws(uploadUri, data);
+    this._last_uploadUri = null;
   }
 
 }
