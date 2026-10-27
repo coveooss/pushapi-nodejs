@@ -1,78 +1,132 @@
 # PushAPI-node.js
 
-## Description
+[![CI](https://github.com/coveooss/pushapi-nodejs/actions/workflows/ci.yml/badge.svg)](https://github.com/coveooss/pushapi-nodejs/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/coveo-pushapi-cli)](https://www.npmjs.com/package/coveo-pushapi-cli)
 
-This project is a simple wrapper to help sending JSON payloads using Coveo Cloud V2 PushAPI.
+Command line tool to push JSON payloads to a Coveo [Push source](https://docs.coveo.com/en/68/cloud-v2-developers/push-api) (or a Catalog source, through the Stream API).
 
-## Available documentation
+## Requirements
 
-The code in this project uses the Push API from the Coveo Cloud V2 Platform. You can use the following resource for more information and get started:
+- Node.js **24** or newer (see `.nvmrc`).
+- No runtime dependencies: HTTP calls use Node's built-in `fetch`, and arguments are parsed with `node:util.parseArgs`.
 
-- Push API documentation: [Use the Push API](https://docs.coveo.com/en/68/cloud-v2-developers/push-api)
-
-## Contributing
-
-- Branch or Fork
-- Pull Request
-- And... that's pretty much it!
-
-## How-to build
-
-1. `git clone` this project.
-1. `npm install` to get the dependencies (request, fs).
-
-## CLI command
-
-Install it with NPM:
+## Install
 
 ```bash
-npm i coveo-pushapi-cli --global
+npm install --global coveo-pushapi-cli
 ```
 
-## How-to run
+## Usage
 
-The first time you run in one folder, it will help you to set up your config `.pushapi-config.json` by asking about your `sourceId` and your `API key`.
+The first time you run `pushapi` in a folder, it helps you create the config file `.pushapi-config.json` by asking for your source ID, organization ID, platform and API key. The file is created with `0600` permissions since it holds your API key. Don't commit it.
 
-- Push one JSON payload file:
+```bash
+# Push one JSON payload file. Don't forget to set DocumentId in the payloads.
+pushapi file.json
 
-  `pushapi file.json`
+# Push one file, then delete every item of the source that is older than 24 hours.
+# Typical when you create/update all valid items and want the leftovers gone.
+pushapi file.json -d 24
 
-  where `file.json` is the path to a Push API payload (JSON) file. Don't forget to set `DocumentId` in the payloads.
+# Push every .json file of a folder, batched into as few requests as possible.
+pushapi folder
 
-- Push one JSON payload file, but delete source item older than 24 hours:
+# Dry run: build the batch files (.pushapi.buffer.N) locally, without pushing anything.
+pushapi folder --dry-run
 
-  `pushapi file.json -d 24`
+pushapi --help
+```
 
-  to use typically when you create/update all valid items, you want to delete all other items that are older.
+| Option | Description |
+| --- | --- |
+| `-d, --deleteOlderThan <hours>` | Delete source items older than `<hours>` before pushing. |
+| `-D, --dry-run` | Create the batch files without pushing them. |
+| `--help`, `--version` | Show help / version. |
 
-- Push all JSON payload files from one folder:
+Uploads accept a mix of these JSON formats, including within the same folder:
 
-  `pushapi folder`
+- an array of items
+- a Push API payload: `{ "AddOrUpdate": [ ... ] }`
+- a single item object
 
-  where `folder` is the path to a folder containing multiple Push API JSON payload files.
-  Folder uploads accept a mix of these JSON formats in the same folder:
-  - an array of items
-  - a Push API payload with `AddOrUpdate`
-  - a single item object
+See the `samples/` folder for examples.
+
+### Config file
+
+```json
+{
+  "org": "your-org-id",
+  "source": "your-source-id",
+  "apiKey": "xx--your-api-key--abc",
+  "platform": "push.cloud.coveo.com",
+  "useStreamApi": false,
+  "debug": false
+}
+```
+
+| Key | Description |
+| --- | --- |
+| `org` | Coveo organization ID. |
+| `source` | Push (or Catalog) source ID. |
+| `apiKey` | API key with the `Edit` privilege on the source. |
+| `platform` | Push API host. Defaults to `push.cloud.coveo.com`. Use `pushdev.`, `pushstg.` or `pushhipaa.` for the other platforms. |
+| `useStreamApi` | `true` for a Catalog source: payloads go through the [Stream API](https://docs.coveo.com/en/p4eb0129/) instead of the Push API. |
+| `debug` | `true` to log every request and its response code. |
 
 ## What does it do?
 
-The helper does a minimal validation on the payload, then executes these API calls:
+The tool does a minimal validation of the payload (every document needs a `DocumentId`), then runs these API calls:
 
-1. Change source state to REBUILD
-2. Get a File container
-3. Upload the payload to the File container
-4. Sends the batch command to process the File container
-5. Change the source state back to IDLE
+1. Change the source state to `REBUILD`
+2. Get a file container
+3. Upload the payload to the file container
+4. Send the batch command to process the file container
+5. Change the source state back to `IDLE` (even if a previous step failed)
 
-> **Note**
-> You can add this attribute `"debug": true` in your `.pushapi-config.json` to see these requests and their response code.
+With `useStreamApi`, it instead opens a stream, uploads one chunk per batch, and closes the stream.
 
-## Dependencies
+### Exit codes
 
-- Node.js
-- Node modules: `fs`, `request`
+| Code | Meaning |
+| --- | --- |
+| `0` | Success. |
+| `1` | Missing config file, missing input file, or invalid payload. |
+| `2` to `5` | Invalid config: missing config / `apiKey` / `org` / `source`. |
+| `10` | A request to the platform failed. The response body is printed. |
+
+## Programmatic use
+
+The package is an ES module. It can also be loaded with `require()` on Node 24+.
+
+```js
+import { main } from 'coveo-pushapi-cli';
+
+// Reads .pushapi-config.json from the current folder.
+await main('folder-with-payloads', { deleteOlderThan: 24, dryRun: false });
+```
+
+## Development
+
+```bash
+git clone https://github.com/coveooss/pushapi-nodejs.git
+cd pushapi-nodejs
+npm install
+npm test        # node --test
+npm run lint    # eslint
+```
+
+Tests run against a mocked `fetch`; nothing is pushed to Coveo. CI runs lint and tests on every Node release line declared in `engines`.
+
+## Contributing
+
+- Branch or fork
+- Pull request
+- And... that's pretty much it!
 
 ## Authors
 
 - Jérôme Devost ([GitHub profile](https://github.com/jdevost))
+
+## License
+
+[Apache-2.0](LICENSE)
