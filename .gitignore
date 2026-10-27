@@ -1,4 +1,6 @@
 .DS_Store
 *.key
+*.tgz
 node_modules
 .pushapi-config.json
+.pushapi.buffer.*

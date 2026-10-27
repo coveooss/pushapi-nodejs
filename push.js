@@ -1,73 +1,65 @@
-const fs = require('fs');
+import { readdir, stat, unlink } from 'node:fs/promises';
+import path from 'node:path';
+import { styleText } from 'node:util';
 
-const Config = require('./src/Config');
-const JsonBuffer = require('./src/JsonBuffer');
-const PushApi = require('./src/PushApi');
-const StreamApi = require('./src/StreamApi');
+import Config from './src/Config.js';
+import { CliError, HttpError } from './src/errors.js';
+import JsonBuffer, { BUFFER_FILE_PREFIX, loadJsonFile } from './src/JsonBuffer.js';
+import { countPayloadItems, looksLikePushPayload } from './src/payload.js';
+import PushApi from './src/PushApi.js';
+import StreamApi from './src/StreamApi.js';
 
+const highlight = (text) => styleText(['yellow', 'bold'], String(text));
 
+/**
+ * Runs `work()` with the source in REBUILD status, and always puts it back to IDLE afterwards.
+ */
 async function runWithSourceInRebuild(pushApiHelper, work) {
-  let statusChanged = false;
+  await pushApiHelper.changeStatus('REBUILD');
+
   let result;
   let workError = null;
-
-  await pushApiHelper.changeStatus('REBUILD');
-  statusChanged = true;
-
   try {
     result = await work();
   } catch (error) {
     workError = error;
   }
 
-  if (statusChanged) {
-    try {
-      await pushApiHelper.changeStatus('IDLE');
-    } catch (statusError) {
-      if (workError) {
-        statusError.cause = workError;
-      }
-      throw statusError;
+  try {
+    await pushApiHelper.changeStatus('IDLE');
+  } catch (statusError) {
+    if (workError) {
+      statusError.cause = workError;
     }
+    throw statusError;
   }
 
   if (workError) {
     throw workError;
   }
-
   return result;
 }
 
-function reportError(error) {
-  if (error && error.statusCode) {
+/**
+ * Prints an error to stderr in a readable way.
+ * @param {unknown} error
+ */
+export function reportError(error) {
+  if (error instanceof HttpError) {
     console.error(error.message);
     if (error.body) {
       console.error(error.body);
     }
     return;
   }
-
+  if (error instanceof CliError) {
+    console.error(`\n\t${error.message}`);
+    if (error.cause && process.env.DEBUG) {
+      console.error(error.cause);
+    }
+    return;
+  }
   console.error(error);
-}
-
-function countPayloadItems(payload) {
-  if (!payload) {
-    return 0;
-  }
-
-  if (payload instanceof Array) {
-    return payload.length;
-  }
-
-  if (payload.AddOrUpdate instanceof Array) {
-    return payload.AddOrUpdate.length;
-  }
-
-  if (payload.addOrUpdate instanceof Array) {
-    return payload.addOrUpdate.length;
-  }
-
-  return 1;
 }
 
 async function pushFile(config, file, dryRun = false) {
@@ -77,122 +69,106 @@ async function pushFile(config, file, dryRun = false) {
     return;
   }
 
-  let payload;
-  try {
-    payload = JSON.parse(await fs.promises.readFile(file, 'utf8'));
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      error.message = `Invalid JSON in ${file}: ${error.message}`;
-    }
-    throw error;
-  }
+  const payload = await loadJsonFile(file);
   const itemCount = countPayloadItems(payload);
 
-  // quick validation of the payload
-  if (!payload || (!(payload instanceof Array) && !payload.AddOrUpdate && !payload.addOrUpdate)) {
-    console.warn(`\n\t !! Your payload seems to be in a wrong format !!\n\n\tMissing \x1b[33m\x1b[1m{ "AddOrUpdate": [] }\x1b[0m around your data?\n\n`);
+  if (!looksLikePushPayload(payload)) {
+    console.warn(`\n\t !! Your payload seems to be in a wrong format !!\n\n\tMissing ${highlight('{ "AddOrUpdate": [] }')} around your data?\n\n`);
   }
 
   if (config.useStreamApi) {
     const streamHelper = new StreamApi(config);
     await streamHelper.pushFile(payload);
   } else {
-    console.log(`\nPushing one file to source: \x1b[33m\x1b[1m${config.source}\x1b[0m`);
+    console.log(`\nPushing one file to source: ${highlight(config.source)}`);
     const pushApiHelper = new PushApi(config);
     await runWithSourceInRebuild(pushApiHelper, () => pushApiHelper.pushFile(payload));
   }
 
   console.log(`Processed items: ${itemCount}`);
-  console.log(`\nDone\n`);
+  console.log('\nDone\n');
 }
 
-function deleteBuffers() {
-  let buffers = fs.readdirSync('.').filter(fileName => fileName.startsWith('.pushapi.buffer.'));
-  buffers.forEach(fileName => {
+async function pushFolder(config, folder, dryRun = false) {
+  const folderPath = path.resolve(folder);
+  console.log(`Loading folder: ${folderPath}`);
+
+  const useStreamApi = Boolean(config.useStreamApi);
+  const apiHelper = useStreamApi ? new StreamApi(config) : new PushApi(config);
+
+  const processFiles = async () => {
+    if (useStreamApi && !dryRun) {
+      await apiHelper.openStream();
+    }
+    try {
+      const pushApiBuffer = new JsonBuffer(apiHelper, config, dryRun);
+      // process every .json file in the folder, batched into as few requests as possible.
+      const files = (await readdir(folderPath)).filter((fileName) => fileName.endsWith('.json')).sort();
+      for (const fileName of files) {
+        await pushApiBuffer.addJsonFile(path.join(folderPath, fileName));
+      }
+      await pushApiBuffer.sendBuffer();
+      console.log(`Processed items: ${pushApiBuffer.totalItemCount}`);
+    } finally {
+      if (useStreamApi && !dryRun) {
+        await apiHelper.closeStream();
+      }
+    }
+  };
+
+  if (useStreamApi || dryRun) {
+    await processFiles();
+  } else {
+    console.log(`\nUpdate status for source: ${highlight(config.source)}`);
+    await runWithSourceInRebuild(apiHelper, processFiles);
+  }
+
+  console.log('\nDone\n');
+}
+
+async function deleteBuffers(dir = process.cwd()) {
+  const buffers = (await readdir(dir)).filter((fileName) => fileName.startsWith(BUFFER_FILE_PREFIX));
+  for (const fileName of buffers) {
     console.log('deleting buffer: ', fileName);
-    fs.unlinkSync(fileName);
-  });
+    await unlink(path.join(dir, fileName));
+  }
   console.log('');
 }
 
-async function main(FILE_OR_FOLDER, argv = { deleteOlderThan: null }) {
+/**
+ * Pushes a JSON payload file, or every .json file of a folder, to the source configured in `.pushapi-config.json`.
+ *
+ * @param {string} fileOrFolder
+ * @param {{ deleteOlderThan?: number | null, dryRun?: boolean }} [options]
+ */
+export async function main(fileOrFolder, { deleteOlderThan = null, dryRun = false } = {}) {
+  const config = await Config.load();
+  const pushApiHelper = new PushApi(config, dryRun);
 
+  if (deleteOlderThan !== null && deleteOlderThan !== undefined) {
+    const orderingId = Date.now() - deleteOlderThan * 60 * 60 * 1000 - 1;
+    console.log(`Deleting items older than ${deleteOlderThan} hours (${orderingId}).`);
+    await pushApiHelper.deleteOlderThan(orderingId);
+  }
+
+  if (dryRun) {
+    await deleteBuffers();
+  }
+
+  let stats;
   try {
-    const dryRun = argv['dry-run'] ? true : false;
+    stats = await stat(fileOrFolder);
+  } catch (cause) {
+    throw new CliError(`Couldn't find file or folder: ${fileOrFolder}`, { cause });
+  }
 
-    const config = new Config();
-    const pushApiHelper = new PushApi(config, dryRun);
-
-    if (argv.deleteOlderThan !== null) {
-      const orderingId = Date.now() - (argv.deleteOlderThan * 60 * 60 * 1000) - 1;
-      console.log(`Deleting items older than ${argv.deleteOlderThan} hours (${orderingId}).`);
-      await pushApiHelper.deleteOlderThan(orderingId);
-    }
-
-    if (dryRun) {
-      deleteBuffers();
-    }
-
-    let stats = fs.statSync(FILE_OR_FOLDER);
-    if (stats.isDirectory()) {
-
-      let _dir = process.cwd();
-      let folderName = FILE_OR_FOLDER;
-
-      // process every .json files in the folder as separate batch requests.
-      console.log(`Loading folder: ${_dir}/${folderName}`);
-
-      console.log('\nUpdate status for source: \x1b[33m \x1b[1m', config.source, '\x1b[0m');
-      const pushFolder = async () => {
-        let apiHelper = null;
-        if (config.useStreamApi) {
-          apiHelper = new StreamApi(config);
-          await apiHelper.openStream();
-        }
-        else {
-          apiHelper = new PushApi(config);
-        }
-
-        try {
-          let pushApiBuffer = new JsonBuffer(apiHelper, config, dryRun);
-          let files = fs.readdirSync(`${_dir}/${folderName}`);
-
-          // consider only .json files
-          files = files.filter(fileName => (/\.json$/.test(fileName)));
-          for (let fileName of files) {
-            await pushApiBuffer.addJsonFile(`${_dir}/${folderName}/${fileName}`);
-          }
-          await pushApiBuffer.sendBuffer();
-          console.log(`Processed items: ${pushApiBuffer.totalItemCount}`);
-        } finally {
-          if (config.useStreamApi && apiHelper) {
-            await apiHelper.closeStream();
-          }
-        }
-      };
-
-      if (config.useStreamApi) {
-        await pushFolder();
-      } else {
-        await runWithSourceInRebuild(pushApiHelper, pushFolder);
-      }
-
-      console.log(`\nDone\n`);
-
-    } else if (stats.isFile()) {
-      await pushFile(config, FILE_OR_FOLDER, argv['dry-run'] ? true : false);
-    } else if (argv.help) {
-      argv.help();
-    }
-
-  } catch (e) {
-    reportError(e);
-    process.exit(10);
+  if (stats.isDirectory()) {
+    await pushFolder(config, fileOrFolder, dryRun);
+  } else if (stats.isFile()) {
+    await pushFile(config, fileOrFolder, dryRun);
+  } else {
+    throw new CliError(`Not a file or a folder: ${fileOrFolder}`);
   }
 }
 
-
-exports.main = main;
-exports.Config = Config;
-exports.PushApi = PushApi;
-exports.StreamApi = StreamApi;
+export { Config, PushApi, StreamApi, CliError, HttpError };

@@ -1,8 +1,28 @@
 {
   "name": "coveo-pushapi-cli",
-  "version": "2.0.0",
+  "version": "3.0.1",
   "description": "Command line tool to push JSON payloads to the Coveo Cloud using the PushAPI",
+  "type": "module",
   "main": "push.js",
+  "exports": "./push.js",
+  "bin": {
+    "pushapi": "client-global.js"
+  },
+  "files": [
+    "client-global.js",
+    "push.js",
+    "src/*.js"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "prepack": "npm run lint && npm test"
+  },
   "keywords": [
     "coveo",
     "cloud",
@@ -10,14 +30,11 @@
     "pushapi",
     "json"
   ],
-  "dependencies": {
-    "yargs": "^18.0.0"
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0"
   },
-  "engines": {
-    "node": "^20.19.0 || ^22.12.0 || >=23"
-  },
-  "devDependencies": {},
-  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/coveooss/pushapi-nodejs.git"
@@ -26,13 +43,6 @@
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/coveooss/pushapi-nodejs/issues"
-  },
-  "files": [
-    "push.js",
-    "src/*.js"
-  ],
-  "bin": {
-    "pushapi": "client-global.js"
   },
   "homepage": "https://github.com/coveooss/pushapi-nodejs#readme"
 }

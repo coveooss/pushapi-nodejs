@@ -1,53 +1,40 @@
-'use strict';
+import PlatformRequestsHelper from './PlatformRequestsHelper.js';
 
-const PlatformRequestsHelper = require('./PlatformRequestsHelper');
-
-class StreamApi extends PlatformRequestsHelper {
-
+export default class StreamApi extends PlatformRequestsHelper {
   getApiEndpoint() {
     return this.config.platform.replace(/^push/, 'api');
   }
 
+  _streamUrl(suffix) {
+    const { org, source } = this.config;
+    return `https://${this.getApiEndpoint()}/push/v1/organizations/${org}/sources/${source}/stream/${suffix}`;
+  }
+
   async openStream() {
-    let config = this.config;
-    return this._sendRequest(`POST`, `https://${this.getApiEndpoint()}/push/v1/organizations/${config.org}/sources/${config.source}/stream/open`).then(
-      body => {
-        console.log('\nOpen stream to source: \x1b[33m \x1b[1m', this.config.source, '\x1b[0m', this._now());
-        const resp = (typeof body === 'string') ? JSON.parse(body) : body;
+    const resp = await this._sendJsonRequest('POST', this._streamUrl('open'));
+    console.log(`\nOpen stream to source: ${this._highlight(this.config.source)}`, this._now());
 
-        this._debug('uploadUri: ', resp.uploadUri);
-        this._log('streamId: ', resp.streamId);
+    this._debug('uploadUri: ', resp.uploadUri);
+    this._log('streamId: ', resp.streamId);
 
-        this._last_uploadUri = resp.uploadUri;
-        this._last_streamId = resp.streamId;
+    this._last_uploadUri = resp.uploadUri;
+    this._last_streamId = resp.streamId;
 
-        return resp;
-      }
-    );
+    return resp;
   }
 
-  async getChunk(streamInfo) {
-    let config = this.config;
-    return this._sendRequest(`POST`, `https://${this.getApiEndpoint()}/push/v1/organizations/${config.org}/sources/${config.source}/stream/${this._last_streamId}/chunk`).then(
-      body => {
-        console.log('\nGet chunk for stream: \x1b[33m \x1b[1m', this.config.source, '\x1b[0m', this._now());
-        const resp = (typeof body === 'string') ? JSON.parse(body) : body;
+  async getChunk() {
+    const resp = await this._sendJsonRequest('POST', this._streamUrl(`${this._last_streamId}/chunk`));
+    console.log(`\nGet chunk for stream: ${this._highlight(this.config.source)}`, this._now());
 
-        this._debug('uploadUri: ', resp.uploadUri);
-        return resp;
-      }
-    );
+    this._debug('uploadUri: ', resp.uploadUri);
+    return resp;
   }
 
-  async closeStream(streamInfo) {
-    let config = this.config;
-    return this._sendRequest(`POST`, `https://${this.getApiEndpoint()}/push/v1/organizations/${config.org}/sources/${config.source}/stream/${this._last_streamId}/close`).then(
-      body => {
-        console.log('Close stream.', this._now());
-        let resp = (typeof body === 'string') ? JSON.parse(body) : body;
-        return resp;
-      }
-    );
+  async closeStream() {
+    const resp = await this._sendJsonRequest('POST', this._streamUrl(`${this._last_streamId}/close`));
+    console.log('Close stream.', this._now());
+    return resp;
   }
 
   async pushFile(data) {
@@ -57,13 +44,8 @@ class StreamApi extends PlatformRequestsHelper {
     try {
       await this.uploadFileToAws(streamInfo.uploadUri, data);
     } finally {
-      await this.closeStream(streamInfo);
+      await this.closeStream();
     }
-  }
-
-  static throwError(msg, code) {
-    console.warn(`\n\t${msg}`);
-    process.exit(code || 1);
   }
 
   async pushJsonPayload(data) {
@@ -81,7 +63,4 @@ class StreamApi extends PlatformRequestsHelper {
     await this.uploadFileToAws(uploadUri, data);
     this._last_uploadUri = null;
   }
-
 }
-
-module.exports = StreamApi;

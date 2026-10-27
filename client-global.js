@@ -1,30 +1,93 @@
 #!/usr/bin/env node
-const { main, Config } = require('./push.js');
-const fs = require('fs');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { parseArgs } from 'node:util';
 
-const argv = yargs(hideBin(process.argv))
-  .usage('\nUsage: $0 <File_or_Folder> [options]')
-  .example('$0 file1.json', 'Upload a single file to a Push Source')
-  .example('$0 folder2', 'Upload all .json files from a folder to a Push Source')
-  .example('$0 folder3 -d 2', 'Sends a deleteOlderThan 2 hours before pushing new data')
-  .alias('d', 'deleteOlderThan')
-  .default('d', null)
-  .describe('d', 'Set the deleteOlderThan delay (in hours)')
-  .alias('D', 'dry-run')
-  .boolean('D')
-  .describe('D', 'Dry run - creates the batch files, without pushing them')
-  .demandCommand(1, 'You need to specify a FILE or a FOLDER\n')
-  .help()
-  .parse();
+import pkg from './package.json' with { type: 'json' };
+import { main, reportError, Config } from './push.js';
+import { CONFIG_FILE_NAME } from './src/Config.js';
 
-const FILE_OR_FOLDER = argv._[0];
+const HELP = `
+Usage: pushapi <File_or_Folder> [options]
 
-let configFile = `${process.cwd()}/.pushapi-config.json`;
-if (!fs.existsSync(configFile)) {
-  console.warn(`\n\tCouldn't load ${configFile} file`);
-  Config.createConfig(configFile, () => main(FILE_OR_FOLDER, argv));
-} else {
-  return main(FILE_OR_FOLDER, argv);
+Options:
+  -d, --deleteOlderThan <hours>  Set the deleteOlderThan delay (in hours)
+  -D, --dry-run                  Dry run - creates the batch files, without pushing them
+  -h, --help                     Show help
+  -v, --version                  Show version number
+
+Examples:
+  pushapi file1.json    Upload a single file to a Push Source
+  pushapi folder2       Upload all .json files from a folder to a Push Source
+  pushapi folder3 -d 2  Sends a deleteOlderThan 2 hours before pushing new data
+`;
+
+/** Prints the usage and the error message to stderr, then exits with code 1. */
+function usageError(message) {
+  console.error(HELP);
+  console.error(`${message}\n`);
+  process.exit(1);
+}
+
+/**
+ * Parses the command line into `{ fileOrFolder, deleteOlderThan, dryRun }`.
+ * Exits the process on --help, --version, or invalid arguments.
+ */
+function parseCommandLine(args) {
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args,
+      allowPositionals: true,
+      options: {
+        deleteOlderThan: { type: 'string', short: 'd' },
+        'dry-run': { type: 'boolean', short: 'D', default: false },
+        help: { type: 'boolean', short: 'h', default: false },
+        version: { type: 'boolean', short: 'v', default: false },
+      },
+    });
+  } catch (error) {
+    return usageError(error.message);
+  }
+
+  const { values, positionals } = parsed;
+  if (values.help) {
+    console.log(HELP);
+    process.exit(0);
+  }
+  if (values.version) {
+    console.log(pkg.version);
+    process.exit(0);
+  }
+
+  if (positionals.length !== 1) {
+    return usageError(positionals.length === 0 ? 'You need to specify a FILE or a FOLDER' : `Too many arguments: ${positionals.join(' ')}`);
+  }
+
+  let deleteOlderThan = null;
+  if (values.deleteOlderThan !== undefined) {
+    deleteOlderThan = Number(values.deleteOlderThan);
+    if (values.deleteOlderThan.trim() === '' || !Number.isFinite(deleteOlderThan) || deleteOlderThan < 0) {
+      return usageError(`--deleteOlderThan expects a number of hours, got: ${values.deleteOlderThan}`);
+    }
+  }
+
+  return { fileOrFolder: positionals[0], deleteOlderThan, dryRun: values['dry-run'] };
+}
+
+const { fileOrFolder, ...options } = parseCommandLine(process.argv.slice(2));
+
+try {
+  const configFile = path.join(process.cwd(), CONFIG_FILE_NAME);
+  if (!existsSync(configFile)) {
+    console.warn(`\n\tCouldn't load ${configFile} file`);
+    const created = await Config.createConfig(configFile);
+    if (!created) {
+      process.exit(0);
+    }
+  }
+  await main(fileOrFolder, options);
+} catch (error) {
+  reportError(error);
+  process.exitCode = typeof error?.exitCode === 'number' ? error.exitCode : 10;
 }

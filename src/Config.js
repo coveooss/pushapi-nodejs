@@ -1,106 +1,131 @@
-const fs = require("fs");
+import { chmod, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { stdin, stdout } from 'node:process';
+import { createInterface } from 'node:readline/promises';
 
-class Config {
-  constructor() {
-    this._dir = process.cwd();
+import { CliError } from './errors.js';
+
+export const CONFIG_FILE_NAME = '.pushapi-config.json';
+export const DEFAULT_PLATFORM = 'push.cloud.coveo.com';
+
+const PLACEHOLDERS = {
+  apiKey: 'xx--your-api-key--abc',
+  org: 'your-org-id',
+  source: 'your-source-id',
+};
+
+const EXIT_CODES = {
+  missingFile: 1,
+  missingConfig: 2,
+  apiKey: 3,
+  org: 4,
+  source: 5,
+};
+
+const isYes = (answer) => /^y(es)?$/i.test(answer);
+
+export default class Config {
+  /**
+   * Loads and validates `.pushapi-config.json` from `dir`.
+   * @param {string} [dir] defaults to the current working directory
+   * @returns {Promise<object>} the validated config
+   */
+  static async load(dir = process.cwd()) {
+    const configFile = path.join(dir, CONFIG_FILE_NAME);
+    let config;
+    try {
+      config = JSON.parse(await readFile(configFile, 'utf8'));
+    } catch (cause) {
+      throw new CliError(`Couldn't load ${CONFIG_FILE_NAME} file from ${dir}`, { exitCode: EXIT_CODES.missingFile, cause });
+    }
+    return Config.validate(config);
+  }
+
+  /**
+   * Validates a config object, filling in defaults.
+   * @param {object} config
+   * @returns {object} the same object, with defaults applied
+   */
+  static validate(config) {
+    if (!config || typeof config !== 'object') {
+      throw new CliError(`Missing config (${CONFIG_FILE_NAME})`, { exitCode: EXIT_CODES.missingConfig });
+    }
+    config.platform ||= DEFAULT_PLATFORM;
+
+    for (const field of ['apiKey', 'org', 'source']) {
+      if (!config[field] || config[field] === PLACEHOLDERS[field]) {
+        throw new CliError(`Missing ${field} in ${CONFIG_FILE_NAME}`, { exitCode: EXIT_CODES[field] });
+      }
+    }
+    return config;
+  }
+
+  /**
+   * Interactively creates the config file.
+   * @param {string} configFilePath
+   * @returns {Promise<boolean>} true when the file was created, false when the user declined
+   */
+  static async createConfig(configFilePath) {
+    const rl = createInterface({ input: stdin, output: stdout });
+
+    // Lines received while no question is pending (e.g. piped stdin) are kept for the next question.
+    const pendingLines = [];
+    rl.on('line', (line) => pendingLines.push(line));
+    // If stdin closes before every question is answered, bail out instead of hanging forever.
+    const closed = new Promise((_, reject) => {
+      rl.once('close', () => reject(new CliError('Input closed before the config was complete. No config file created.')));
+    });
+    closed.catch(() => {});
+
+    const ask = async (message) => {
+      if (pendingLines.length > 0) {
+        const answer = pendingLines.shift();
+        stdout.write(`${message}${answer}\n`);
+        return answer.trim();
+      }
+      const answer = await Promise.race([rl.question(message), closed]);
+      return answer.trim();
+    };
 
     try {
-      this.config = require(`${this._dir}/.pushapi-config`);
-    } catch (e) {
-      Config.throwError(`Couldn't load .pushapi-config.json file from ${this._dir}`);
-    }
-
-    this.validateConfig();
-    return this.config;
-  }
-
-  validateConfig() {
-    if (!this.config) {
-      Config.throwError("Missing config (.pushapi-config.json)", 2);
-    }
-    if (!this.config.platform) {
-      this.config.platform = "push.cloud.coveo.com";
-    }
-
-    if (!this.config.apiKey || this.config.apiKey === "xx--your-api-key--abc") {
-      Config.throwError("Missing apiKey in .pushapi-config.json", 3);
-    }
-    if (!this.config.org || this.config.org === "your-org-id") {
-      Config.throwError("Missing org in .pushapi-config.json", 4);
-    }
-    if (!this.config.source || this.config.source === "your-source-id") {
-      Config.throwError("Missing source in .pushapi-config.json", 5);
-    }
-  }
-
-  static async ask(rl, message) {
-    return new Promise((resolve) => {
-      rl.question(message, (answer) => {
-        resolve((answer || "").trim());
-      });
-    });
-  }
-
-  static async createConfig(configFilePath, callback) {
-    const readline = require("readline");
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    const shouldCreate = await Config.ask(rl, "\nWould you like to create the config file now? [Y/n] ");
-    if (!shouldCreate || /^y(es)?$/i.test(shouldCreate)) {
-      let source = await Config.ask(rl, "Source ID: ");
-
-      let isCatalogSource = await Config.ask(rl, "Is it a Catalog Source? [y/N] ");
-      isCatalogSource = /^y(es)?$/i.test(isCatalogSource);
-
-      const orgFromSourceId = source.split("-")[0];
-      let org = await Config.ask(rl, `Org ID: [${orgFromSourceId}]`);
-      if (!org && orgFromSourceId) {
-        org = orgFromSourceId;
+      const shouldCreate = await ask('\nWould you like to create the config file now? [Y/n] ');
+      if (shouldCreate && !isYes(shouldCreate)) {
+        return false;
       }
 
-      let platform = await Config.ask(rl, "Platform: (empty for prod) [dev, stg, hipaa]");
-      platform = platform.toLowerCase();
-      // validate platform input
+      const source = await ask('Source ID: ');
+      const isCatalogSource = isYes(await ask('Is it a Catalog Source? [y/N] '));
+
+      const orgFromSourceId = source.split('-')[0];
+      const org = (await ask(`Org ID: [${orgFromSourceId}] `)) || orgFromSourceId;
+
+      let platform = (await ask('Platform (empty for prod) [dev, stg, hipaa]: ')).toLowerCase();
       if (platform && !/^(dev|stg|hipaa|prod)$/.test(platform)) {
-        console.warn("Invalid platform, defaulting to prod");
-        platform = "";
+        console.warn('Invalid platform, defaulting to prod');
+        platform = '';
       }
-      if (platform === "prod") {
-        platform = "";
+      if (platform === 'prod') {
+        platform = '';
       }
-      const platformHost = `push${platform || ""}.cloud.coveo.com`;
 
-      const apiKey = await Config.ask(rl, `API key: `);
+      const apiKey = await ask('API key: ');
 
-      rl.close();
-      console.log("creating file: ", configFilePath);
-      let payload = {
+      const payload = {
         org,
         source,
         apiKey,
-        platform: platformHost,
+        platform: `push${platform}.cloud.coveo.com`,
       };
       if (isCatalogSource) {
         payload.useStreamApi = true;
       }
-      fs.writeFileSync(configFilePath, JSON.stringify(payload, null, 2));
 
-      fs.chmodSync(configFilePath, 0o600);
-
-      await callback();
-    } else {
+      console.log('creating file: ', configFilePath);
+      await writeFile(configFilePath, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+      await chmod(configFilePath, 0o600);
+      return true;
+    } finally {
       rl.close();
-      process.exit();
     }
   }
-
-  static throwError(msg, code) {
-    console.warn(`\n\t${msg}`);
-    process.exit(code || 1);
-  }
 }
-
-module.exports = Config;

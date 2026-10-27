@@ -1,201 +1,106 @@
-'use strict';
-const https = require('https');
+import { styleText } from 'node:util';
 
-class PlatformRequestsHelper {
+import { HttpError } from './errors.js';
+import { validatePayload } from './payload.js';
 
+export default class PlatformRequestsHelper {
   constructor(config, dryRun = false) {
     this._dryRun = dryRun;
     this.config = config;
 
-    this._debug('\nconfig = ', this.config);
+    this._debug('\nconfig = ', { ...config, apiKey: '***' });
   }
 
-  _debug() {
+  _debug(...args) {
     if (this.config.debug) {
-      console.debug.apply(console, arguments);
+      console.debug(...args);
     }
   }
 
-  _log() {
-    console.log.apply(console, arguments);
+  _log(...args) {
+    console.log(...args);
   }
 
   _now() {
-    let time = new Date().toLocaleTimeString('en-US', {
-      hour12: false
-    });
-    return `\x1b[94m ${time} \x1b[0m`;
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+    return styleText('blueBright', ` ${time} `);
+  }
+
+  _highlight(text) {
+    return styleText(['yellow', 'bold'], String(text));
   }
 
   /**
-   * Utility function to check if a key in a JSON object. The JSON payload for the Push Api is case-insensitive, so DocumentId is the same as documentid.
-   * @param {string} key
-   * @param {Object} obj
+   * Builds the URL for a Push API action.
+   * `action` is either a path relative to the source (e.g. `status?statusType=IDLE`) or an absolute URL.
    */
-  _isKeyMissingInObject(key, obj) {
-    const keys = Object.keys(obj).map(k => k.toLowerCase());
-    return !(keys.includes(key.toLowerCase()));
+  _buildUrl(action) {
+    if (/^https?:\/\//.test(action)) {
+      return new URL(action);
+    }
+    const { platform, org, source } = this.config;
+    return new URL(`https://${platform}/v1/organizations/${org}/sources/${source}/${action}`);
   }
 
-  _buildHttpError(response, body, context) {
-    const error = new Error(`${context} failed with status ${response.statusCode}${response.statusMessage ? ` ${response.statusMessage}` : ''}`);
-    error.statusCode = response.statusCode;
-    error.statusMessage = response.statusMessage;
-    error.body = body;
-    error.req = response.req;
-    return error;
-  }
-
-  async _sendRequest(method, action) {
-
+  async _sendRequest(method, action, body) {
     this._debug('_sendRequest::', method, action);
 
-    const config = this.config;
-    let hostname = config.platform;
-    let path = `/v1/organizations/${config.org}/sources/${config.source}/${action}`;
-
-    if (/^http/.test(action)) {
-      const url = new URL(action);
-      hostname = url.hostname;
-      path = `${url.pathname}${url.search}`;
-    }
+    const url = this._buildUrl(action);
+    const context = `${method} ${url.host}${url.pathname}`;
 
     if (this._dryRun) {
-      console.log('DRY-RUN: skip ');
-      return Promise.resolve();
+      console.log('DRY-RUN: skip ', context);
+      return undefined;
     }
 
-    return new Promise((resolve, reject) => {
-      const options = {
-        method: method,
-        hostname,
-        path,
-        port: 443,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`,
-        },
-      };
-
-      const req = https.request(options,
-        (resp) => {
-          this._debug('statusCode:', resp.statusCode);
-          this._debug('headers:', resp.headers);
-
-          let data = "";
-          resp.on("data", chunk => {
-            data += chunk;
-          });
-          resp.on("end", () => {
-            this._debug('\nREQUEST: ', method, resp.statusCode, data);
-            if (resp.statusCode >= 400) {
-              reject(this._buildHttpError(resp, data, `${method} ${hostname}${path}`));
-            } else {
-              resolve(data);
-            }
-          });
-        });
-      req.on('error', (err) => {
-        console.log('ERROR: ', err);
-        reject(err);
-      });
-      req.end();
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
+
+    const data = await response.text();
+    this._debug('\nREQUEST: ', method, response.status, data);
+
+    if (!response.ok) {
+      throw new HttpError(context, response, data);
+    }
+    return data;
+  }
+
+  async _sendJsonRequest(method, action, body) {
+    const data = await this._sendRequest(method, action, body);
+    return data ? JSON.parse(data) : data;
   }
 
   async uploadFileToAws(uploadUri, body) {
     const url = new URL(uploadUri);
-    const path = `${url.pathname}${url.search}`;
+    const postData = JSON.stringify(body);
+    this._debug('\n\nuploadFileToAws:\n', `PUT ${url.host}${url.pathname}`, `${Buffer.byteLength(postData)} bytes`);
 
-    return new Promise((resolve, reject) => {
-      const postData = JSON.stringify(body);
-      const options = {
-        method: 'PUT',
-        hostname: url.hostname,
-        path,
-        port: 443,
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'Content-Length': Buffer.byteLength(postData),
-          'x-amz-server-side-encryption': 'AES256'
-        },
-      };
-      this._debug('\n\nuploadFileToAws:\n', options);
-
-      const req = https.request(options, (response) => {
-        let data = "";
-        response.on('data', chunk => {
-          data += chunk;
-        });
-        response.on('end', () => {
-          this._debug(response.statusCode, response.statusMessage);
-          if (response.statusCode >= 200 && response.statusCode < 300) {
-            console.log('File uploaded to AWS. ', this._now());
-            resolve(response);
-          } else {
-            reject(this._buildHttpError(response, data, `PUT ${url.hostname}${path}`));
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        console.log('ERROR 1: ', error, uploadUri);
-        reject(error);
-      });
-      req.write(postData);
-      req.end();
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'x-amz-server-side-encryption': 'AES256',
+      },
+      body: postData,
     });
+
+    const data = await response.text();
+    this._debug(response.status, response.statusText);
+
+    if (!response.ok) {
+      throw new HttpError(`PUT ${url.host}${url.pathname}`, response, data);
+    }
+    console.log('File uploaded to AWS. ', this._now());
+    return response;
   }
 
   validatePayload(data) {
-    // validate payload first
-    if (!data) {
-      console.warn('Invalid payload: not defined.');
-    }
-    if (data instanceof Array) {
-      data = {
-        AddOrUpdate: data
-      }; // need to wrap arrays of documents into AddOrUpdate
-    }
-
-    if (this._isKeyMissingInObject('AddOrUpdate', data)) {
-      // wrap payload into {"AddOrUpdate": [data]}
-      data = {
-        AddOrUpdate: [
-          data
-        ]
-      };
-    } else if (!data.AddOrUpdate) {
-      // AddOrUpdate is present, but using a different case.
-
-      // find the key using the different case
-      let key = Object.keys(data).filter(k => k.match(/AddOrUpdate/i))[0];
-
-      // replacing key by 'AddOrUpdate'
-      data.AddOrUpdate = data[key];
-      delete data[key];
-    }
-
-    let fileExtensionWarning = false;
-    // validate each document has a DocumentId
-    data.AddOrUpdate.forEach(d => {
-      if (this._isKeyMissingInObject('DocumentId', d)) {
-        console.warn(`Missing DocumentId in some documents in the payload. Stopping.`);
-        throw new Error('No DocumentId.');
-      }
-      if (!fileExtensionWarning && this._isKeyMissingInObject('FileExtension', d)) {
-        console.log(`Missing FileExtension in some documents. It's good practice to provide them.`);
-        fileExtensionWarning = true;
-      }
-    });
-
-    return data;
-  }
-
-  static throwError(msg, code) {
-    console.warn(`\n\t${msg}`);
-    process.exit(code || 1);
+    return validatePayload(data);
   }
 }
-
-module.exports = PlatformRequestsHelper;

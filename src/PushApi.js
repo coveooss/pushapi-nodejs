@@ -1,42 +1,34 @@
-'use strict';
+import PlatformRequestsHelper from './PlatformRequestsHelper.js';
 
-const PlatformRequestsHelper = require('./PlatformRequestsHelper');
-
-class PushApi extends PlatformRequestsHelper {
-
+export default class PushApi extends PlatformRequestsHelper {
   async changeStatus(state) {
-    console.log(`Change source status to \x1b[33m\x1b[1m${state}\x1b[0m`, this._now());
-    return this._sendRequest(`POST`, `status?statusType=${state}`);
+    console.log(`Change source status to ${this._highlight(state)}`, this._now());
+    return this._sendRequest('POST', `status?statusType=${encodeURIComponent(state)}`);
   }
 
   async deleteOlderThan(orderingId) {
     if (orderingId < Date.now()) {
-      return this._sendRequest(`DELETE`, `documents/olderthan?orderingId=${orderingId}`);
+      return this._sendRequest('DELETE', `documents/olderthan?orderingId=${orderingId}`);
     }
+    return undefined;
   }
 
   async getLargeFileContainer() {
-    let config = this.config;
-    return this._sendRequest(`POST`, `https://${config.platform}/v1/organizations/${config.org}/files`).then(
-      body => {
-        console.log('getLargeFileContainer');
-        let resp = (typeof body === 'string') ? JSON.parse(body) : body;
+    const { platform, org } = this.config;
+    const resp = await this._sendJsonRequest('POST', `https://${platform}/v1/organizations/${org}/files`);
+    console.log('getLargeFileContainer');
 
-        this.uploadUri = resp.uploadUri;
-        this.fileId = resp.fileId;
+    this.uploadUri = resp.uploadUri;
+    this.fileId = resp.fileId;
 
-        this._debug('uploadUri: ', resp.uploadUri);
-        this._log('fileId: ', resp.fileId);
+    this._debug('uploadUri: ', resp.uploadUri);
+    this._log('fileId: ', resp.fileId);
 
-        return resp;
-      }
-    );
+    return resp;
   }
 
   async pushFile(data) {
-    data = this.validatePayload(data);
-
-    return await this.pushJsonPayload(data);
+    return this.pushJsonPayload(this.validatePayload(data));
   }
 
   async pushJsonPayload(data) {
@@ -50,10 +42,7 @@ class PushApi extends PlatformRequestsHelper {
     await this.sendBatchRequest();
   }
 
-  async sendBatchRequest(fileId) {
-    return this._sendRequest(`PUT`, `documents/batch?fileId=${fileId || this.fileId}`);
+  async sendBatchRequest(fileId = this.fileId) {
+    return this._sendRequest('PUT', `documents/batch?fileId=${encodeURIComponent(fileId)}`);
   }
-
 }
-
-module.exports = PushApi;
