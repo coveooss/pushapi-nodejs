@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
-import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import pkg from './package.json' with { type: 'json' };
 import { main, reportError, Config } from './push.js';
-import { CONFIG_FILE_NAME } from './src/Config.js';
 
 const HELP = `
 Usage: pushapi <File_or_Folder> [options]
 
 Options:
+  -c, --config <file>            Config file to use (default: .pushapi-config.json in the current folder)
   -d, --deleteOlderThan <hours>  Set the deleteOlderThan delay (in hours)
   -D, --dry-run                  Dry run - creates the batch files, without pushing them
   -h, --help                     Show help
@@ -20,6 +19,7 @@ Examples:
   pushapi file1.json    Upload a single file to a Push Source
   pushapi folder2       Upload all .json files from a folder to a Push Source
   pushapi folder3 -d 2  Sends a deleteOlderThan 2 hours before pushing new data
+  pushapi folder4 -c ../staging.json  Uses another config file than .pushapi-config.json
 `;
 
 /** Prints the usage and the error message to stderr, then exits with code 1. */
@@ -30,7 +30,7 @@ function usageError(message) {
 }
 
 /**
- * Parses the command line into `{ fileOrFolder, deleteOlderThan, dryRun }`.
+ * Parses the command line into `{ fileOrFolder, config, deleteOlderThan, dryRun }`.
  * Exits the process on --help, --version, or invalid arguments.
  */
 function parseCommandLine(args) {
@@ -40,6 +40,7 @@ function parseCommandLine(args) {
       args,
       allowPositionals: true,
       options: {
+        config: { type: 'string', short: 'c' },
         deleteOlderThan: { type: 'string', short: 'd' },
         'dry-run': { type: 'boolean', short: 'D', default: false },
         help: { type: 'boolean', short: 'h', default: false },
@@ -72,13 +73,17 @@ function parseCommandLine(args) {
     }
   }
 
-  return { fileOrFolder: positionals[0], deleteOlderThan, dryRun: values['dry-run'] };
+  if (values.config !== undefined && values.config.trim() === '') {
+    return usageError('--config expects a file path');
+  }
+
+  return { fileOrFolder: positionals[0], config: values.config, deleteOlderThan, dryRun: values['dry-run'] };
 }
 
 const { fileOrFolder, ...options } = parseCommandLine(process.argv.slice(2));
 
 try {
-  const configFile = path.join(process.cwd(), CONFIG_FILE_NAME);
+  const configFile = Config.resolvePath(options.config);
   if (!existsSync(configFile)) {
     console.warn(`\n\tCouldn't load ${configFile} file`);
     const created = await Config.createConfig(configFile);

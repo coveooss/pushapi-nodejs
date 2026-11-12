@@ -136,13 +136,15 @@ async function deleteBuffers(dir = process.cwd()) {
 }
 
 /**
- * Pushes a JSON payload file, or every .json file of a folder, to the source configured in `.pushapi-config.json`.
+ * Pushes a JSON payload file, or every .json file of a folder, to the source configured in the config file
+ * (`.pushapi-config.json` in the current folder, unless `options.config` points to another file).
  *
  * @param {string} fileOrFolder
- * @param {{ deleteOlderThan?: number | null, dryRun?: boolean }} [options]
+ * @param {{ deleteOlderThan?: number | null, dryRun?: boolean, config?: string }} [options]
+ *   `config` is the path to the config file to use instead of `.pushapi-config.json`.
  */
-export async function main(fileOrFolder, { deleteOlderThan = null, dryRun = false } = {}) {
-  const config = await Config.load();
+export async function main(fileOrFolder, { deleteOlderThan = null, dryRun = false, config: configFile } = {}) {
+  const config = await Config.loadFile(Config.resolvePath(configFile));
   const pushApiHelper = new PushApi(config, dryRun);
 
   if (deleteOlderThan !== null && deleteOlderThan !== undefined) {

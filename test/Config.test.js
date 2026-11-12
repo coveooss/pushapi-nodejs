@@ -62,3 +62,40 @@ describe('Config.load', () => {
     await assert.rejects(Config.load(dir), { name: 'CliError', exitCode: 1 });
   });
 });
+
+describe('Config.loadFile', () => {
+  it('loads a config file with any name', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'pushapi-'));
+    const configFile = path.join(dir, 'staging.json');
+    await writeFile(configFile, JSON.stringify({ ...validConfig(), platform: 'pushstg.cloud.coveo.com' }));
+
+    const config = await Config.loadFile(configFile);
+    assert.equal(config.platform, 'pushstg.cloud.coveo.com');
+  });
+
+  it('names the file in validation errors', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'pushapi-'));
+    const configFile = path.join(dir, 'custom.json');
+    await writeFile(configFile, JSON.stringify({ ...validConfig(), apiKey: '' }));
+
+    await assert.rejects(Config.loadFile(configFile), { name: 'CliError', exitCode: 3, message: /Missing apiKey in .*custom\.json/ });
+  });
+
+  it('fails with exit code 1 when the file is missing', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'pushapi-'));
+    const configFile = path.join(dir, 'nope.json');
+    await assert.rejects(Config.loadFile(configFile), { name: 'CliError', exitCode: 1, message: /Couldn't load config file .*nope\.json/ });
+  });
+});
+
+describe('Config.resolvePath', () => {
+  it('defaults to the config file name in the given folder', () => {
+    assert.equal(Config.resolvePath(undefined, '/some/dir'), path.resolve('/some/dir', CONFIG_FILE_NAME));
+    assert.equal(Config.resolvePath(''), path.resolve(process.cwd(), CONFIG_FILE_NAME));
+  });
+
+  it('resolves a relative config path from the given folder, and keeps an absolute one', () => {
+    assert.equal(Config.resolvePath('../staging.json', '/some/dir'), path.resolve('/some/staging.json'));
+    assert.equal(Config.resolvePath('/etc/pushapi.json', '/some/dir'), '/etc/pushapi.json');
+  });
+});

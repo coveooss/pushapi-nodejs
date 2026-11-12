@@ -26,35 +26,55 @@ const isYes = (answer) => /^y(es)?$/i.test(answer);
 
 export default class Config {
   /**
+   * Resolves the config file to use: `configFile` when given, otherwise `.pushapi-config.json` in `dir`.
+   * @param {string} [configFile] path to a config file, relative to `dir`
+   * @param {string} [dir] defaults to the current working directory
+   * @returns {string} the absolute path of the config file
+   */
+  static resolvePath(configFile, dir = process.cwd()) {
+    return path.resolve(dir, configFile || CONFIG_FILE_NAME);
+  }
+
+  /**
    * Loads and validates `.pushapi-config.json` from `dir`.
    * @param {string} [dir] defaults to the current working directory
    * @returns {Promise<object>} the validated config
    */
-  static async load(dir = process.cwd()) {
-    const configFile = path.join(dir, CONFIG_FILE_NAME);
+  static load(dir = process.cwd()) {
+    return Config.loadFile(Config.resolvePath(undefined, dir));
+  }
+
+  /**
+   * Loads and validates the config file at `configFile`.
+   * @param {string} configFile path to the config file (relative paths are resolved from the current working directory)
+   * @returns {Promise<object>} the validated config
+   */
+  static async loadFile(configFile) {
+    const resolved = path.resolve(configFile);
     let config;
     try {
-      config = JSON.parse(await readFile(configFile, 'utf8'));
+      config = JSON.parse(await readFile(resolved, 'utf8'));
     } catch (cause) {
-      throw new CliError(`Couldn't load ${CONFIG_FILE_NAME} file from ${dir}`, { exitCode: EXIT_CODES.missingFile, cause });
+      throw new CliError(`Couldn't load config file ${resolved}`, { exitCode: EXIT_CODES.missingFile, cause });
     }
-    return Config.validate(config);
+    return Config.validate(config, resolved);
   }
 
   /**
    * Validates a config object, filling in defaults.
    * @param {object} config
+   * @param {string} [configFile] name of the file the config came from, for error messages
    * @returns {object} the same object, with defaults applied
    */
-  static validate(config) {
+  static validate(config, configFile = CONFIG_FILE_NAME) {
     if (!config || typeof config !== 'object') {
-      throw new CliError(`Missing config (${CONFIG_FILE_NAME})`, { exitCode: EXIT_CODES.missingConfig });
+      throw new CliError(`Missing config (${configFile})`, { exitCode: EXIT_CODES.missingConfig });
     }
     config.platform ||= DEFAULT_PLATFORM;
 
     for (const field of ['apiKey', 'org', 'source']) {
       if (!config[field] || config[field] === PLACEHOLDERS[field]) {
-        throw new CliError(`Missing ${field} in ${CONFIG_FILE_NAME}`, { exitCode: EXIT_CODES[field] });
+        throw new CliError(`Missing ${field} in ${configFile}`, { exitCode: EXIT_CODES[field] });
       }
     }
     return config;

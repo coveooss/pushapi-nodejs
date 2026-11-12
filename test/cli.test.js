@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { cp, mkdtemp, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { cp, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
@@ -87,6 +88,37 @@ describe('pushapi CLI', () => {
     assert.match(stdout, /Processed items: 2/);
     const buffer = JSON.parse(await readFile(path.join(cwd, '.pushapi.buffer.1'), 'utf8'));
     assert.equal(buffer.AddOrUpdate.length, 2);
+  });
+
+  it('uses the config file given with --config instead of .pushapi-config.json', async () => {
+    const cwd = await workdir();
+    const configFile = path.join(cwd, 'configs', 'staging.json');
+    await mkdir(path.dirname(configFile));
+    await writeFile(configFile, JSON.stringify({ org: 'myorg', source: 'myorg-abc123', apiKey: 'xx-key' }));
+
+    const { code, stdout } = await runCli(['samples', '--dry-run', '--config', 'configs/staging.json'], { cwd });
+    assert.equal(code, 0, stdout);
+    assert.doesNotMatch(stdout, /Would you like to create the config file now\?/);
+    assert.match(stdout, /Processed items: 2/);
+    assert.equal(existsSync(path.join(cwd, '.pushapi-config.json')), false);
+  });
+
+  it('offers to create the config file given with -c when it does not exist', async () => {
+    const cwd = await workdir();
+    const answers = ['y', 'myorg-abc123', 'n', '', '', 'xx-key', ''].join('\n');
+    const { code, stdout, stderr } = await runCli(['samples', '-D', '-c', 'custom.json'], { cwd, input: answers });
+    assert.equal(code, 0, stdout);
+    assert.match(stderr, /Couldn't load .*custom\.json/);
+
+    const config = JSON.parse(await readFile(path.join(cwd, 'custom.json'), 'utf8'));
+    assert.equal(config.source, 'myorg-abc123');
+    assert.equal(existsSync(path.join(cwd, '.pushapi-config.json')), false);
+  });
+
+  it('rejects an empty --config value', async () => {
+    const { code, stderr } = await runCli(['samples', '--config', '']);
+    assert.equal(code, 1);
+    assert.match(stderr, /--config expects a file path/);
   });
 
   it('reports a missing payload path with exit code 1', async () => {

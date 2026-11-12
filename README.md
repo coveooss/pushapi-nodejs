@@ -20,6 +20,8 @@ npm install --global coveo-pushapi-cli
 
 The first time you run `pushapi` in a folder, it helps you create the config file `.pushapi-config.json` by asking for your source ID, organization ID, platform and API key. The file is created with `0600` permissions since it holds your API key. Don't commit it.
 
+To use another config file (for example one per source or per environment), pass its path with `--config`. The same interactive setup runs if that file doesn't exist yet.
+
 ```bash
 # Push one JSON payload file. Don't forget to set DocumentId in the payloads.
 pushapi file.json
@@ -34,11 +36,15 @@ pushapi folder
 # Dry run: build the batch files (.pushapi.buffer.N) locally, without pushing anything.
 pushapi folder --dry-run
 
+# Use a specific config file instead of .pushapi-config.json in the current folder.
+pushapi folder --config ../configs/staging.json
+
 pushapi --help
 ```
 
 | Option | Description |
 | --- | --- |
+| `-c, --config <file>` | Config file to use. Defaults to `.pushapi-config.json` in the current folder. |
 | `-d, --deleteOlderThan <hours>` | Delete source items older than `<hours>` before pushing. |
 | `-D, --dry-run` | Create the batch files without pushing them. |
 | `--help`, `--version` | Show help / version. |
@@ -103,6 +109,9 @@ import { main } from 'coveo-pushapi-cli';
 
 // Reads .pushapi-config.json from the current folder.
 await main('folder-with-payloads', { deleteOlderThan: 24, dryRun: false });
+
+// Or reads the given config file (relative paths are resolved from the current folder).
+await main('folder-with-payloads', { config: 'configs/staging.json' });
 ```
 
 ## Development
